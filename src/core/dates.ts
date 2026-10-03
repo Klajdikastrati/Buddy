@@ -105,3 +105,12 @@ export function formatShortDate(date: LocalDate, locale = 'en-GB'): string {
     new Date(`${date}T00:00:00Z`),
   )
 }
+
+/** [1, 3, 5] → "Mon · Wed · Fri" (Monday first); all seven → "Every day". */
+export function formatWeekdays(days: number[]): string {
+  if (days.length === 7) return 'Every day'
+  return [...days]
+    .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
+    .map((d) => WEEKDAY_SHORT[d])
+    .join(' · ')
+}

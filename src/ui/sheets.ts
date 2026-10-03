@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { FoodDraft } from '../core/nutrition'
-import type { Entry, EntryKind, Food, LocalDate } from '../core/types'
+import type { Entry, EntryKind, Food, ID, LocalDate, WorkoutTemplate } from '../core/types'
 
 /** Which sheet is open, app-wide. Kept outside React so any screen can open one. */
 export type SheetState =
@@ -16,6 +16,10 @@ export type SheetState =
   /** Create/edit a food; `logAfter` continues into logging it. */
   | { kind: 'food-edit'; food?: Food; draft?: Partial<FoodDraft>; logAfter?: boolean }
   | { kind: 'recipe'; food?: Food }
+  | { kind: 'workout-start' }
+  | { kind: 'template'; template?: WorkoutTemplate }
+  | { kind: 'workout-summary'; entryId: ID }
+  | { kind: 'exercise'; exerciseId: ID }
 
 let state: SheetState = { kind: 'none' }
 const listeners = new Set<() => void>()

@@ -61,6 +61,7 @@ export function Me() {
       <section className="settings-group with-icons" aria-label="Setup">
         <NavRow icon="target" tint={DOMAIN.plan.tint} label="Targets" trail={targetsTrail} onClick={() => navigate('/me/targets')} />
         <NavRow icon="food" tint={DOMAIN.food.tint} label="Foods & recipes" trail={foodCount ? `${foodCount}` : undefined} onClick={() => navigate('/me/foods')} />
+        <NavRow icon="workout" tint={DOMAIN.workout.tint} label="Training" trail="Templates & exercises" onClick={() => navigate('/me/training')} />
       </section>
 
       <section className="group" aria-labelledby="cat-set">

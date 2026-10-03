@@ -10,3 +10,6 @@ export function parseDecimal(raw: string): number | null {
 export function formatNumber(n: number, digits = 1): string {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: digits }).format(n)
 }
+
+/** 62.5 → "62.5 kg". */
+export const formatKg = (n: number, digits = 1) => `${formatNumber(n, digits)} kg`

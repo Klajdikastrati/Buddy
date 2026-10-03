@@ -50,11 +50,12 @@ export function QuickAddSheet() {
   const actions: { domain: DomainKey; open: () => void }[] = [
     { domain: 'food', open: () => openSheet({ kind: 'food', query: q || undefined }) },
     { domain: 'expense', open: () => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q || undefined } }) },
-    { domain: 'income', open: () => openSheet({ kind: 'money', prefill: { kind: 'income', title: q || undefined } }) },
+    { domain: 'workout', open: () => openSheet({ kind: 'workout-start' }) },
     { domain: 'sleep', open: () => openSheet({ kind: 'sleep' }) },
     { domain: 'weight', open: () => openSheet({ kind: 'weight' }) },
     { domain: 'activity', open: () => openSheet({ kind: 'activity' }) },
     { domain: 'checkin', open: () => openSheet({ kind: 'checkin' }) },
+    { domain: 'income', open: () => openSheet({ kind: 'money', prefill: { kind: 'income', title: q || undefined } }) },
   ]
 
   return (

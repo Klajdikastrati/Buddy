@@ -9,6 +9,7 @@ export function openEntry(entry: Entry) {
   else if (entry.sleep) openSheet({ kind: 'sleep', entry })
   else if (entry.measurement) openSheet({ kind: 'weight', entry })
   else if (entry.activity) openSheet({ kind: 'activity', entry })
+  else if (entry.workout) openSheet({ kind: 'workout-summary', entryId: entry.id })
   else if (entry.money) openSheet({ kind: 'money', entry })
 }
 

@@ -123,13 +123,26 @@ export async function finishWorkout(entryId: ID) {
   })
 }
 
-/** Throw the workout away (entry and sets soft-deleted). */
-export async function discardWorkout(entryId: ID) {
+/** Throw the workout away (entry and sets soft-deleted). Returns what `restoreWorkout` needs for Undo. */
+export async function discardWorkout(entryId: ID): Promise<{ setIds: ID[]; wasActive: boolean }> {
+  const t = now()
+  return db.transaction('rw', [db.entries, db.sets, db.outbox, db.meta], async () => {
+    const entry = await db.entries.get(entryId)
+    if (entry) await put('entries', { ...entry, deletedAt: t, updatedAt: t })
+    const sets = await liveSets(entryId)
+    for (const s of sets) await put('sets', { ...s, deletedAt: t, updatedAt: t })
+    const wasActive = (await db.meta.get('activeWorkout'))?.value === entryId
+    if (wasActive) await db.meta.delete('activeWorkout')
+    return { setIds: sets.map((s) => s.id), wasActive }
+  })
+}
+
+export async function restoreWorkout(entryId: ID, undo: { setIds: ID[]; wasActive: boolean }) {
   const t = now()
   await db.transaction('rw', [db.entries, db.sets, db.outbox, db.meta], async () => {
     const entry = await db.entries.get(entryId)
-    if (entry) await put('entries', { ...entry, deletedAt: t, updatedAt: t })
-    for (const s of await liveSets(entryId)) await put('sets', { ...s, deletedAt: t, updatedAt: t })
-    await db.meta.delete('activeWorkout')
+    if (entry) await put('entries', { ...entry, deletedAt: null, updatedAt: t })
+    for (const s of await db.sets.bulkGet(undo.setIds)) if (s) await put('sets', { ...s, deletedAt: null, updatedAt: t })
+    if (undo.wasActive) await db.meta.put({ key: 'activeWorkout', value: entryId })
   })
 }

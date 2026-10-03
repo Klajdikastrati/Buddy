@@ -1,13 +1,15 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo } from 'react'
 import { ACTIVITY_LABEL, activityOn, sleepSummary, weightSummary } from '../core/body'
-import { addDays, formatDuration, formatLongDate, formatShortDate, hourIn, monthStart } from '../core/dates'
+import { addDays, formatDuration, formatLongDate, formatShortDate, hourIn, monthStart, weekdayOf, weekStart } from '../core/dates'
 import { formatMoney, moneySummary } from '../core/money'
 import { nutritionOn } from '../core/nutrition'
 import { formatNumber } from '../core/numbers'
 import { targetOn } from '../core/targets'
-import type { DayCheckin, Entry, LocalDate, Target } from '../core/types'
+import { durationMin, finishedWorkouts, templatesOn, workoutsInWeek } from '../core/training'
+import type { DayCheckin, Entry, ID, LocalDate, Target, WorkoutTemplate } from '../core/types'
 import { db } from '../data/db'
+import { startWorkout } from '../data/repo-training'
 import { Bar } from '../ui/Bar'
 import { DOMAIN, type DomainKey } from '../ui/domains'
 import { openEntry } from '../ui/entryActions'
@@ -33,10 +35,12 @@ export function Today() {
   const targets = useLiveQuery(() => db.targets.toArray(), [])
   const weights = useLiveQuery(() => db.entries.where('kind').equals('weight').toArray(), [])
   const checkin = useLiveQuery(async () => (await db.checkins.get(today)) ?? null, [today])
+  const templates = useLiveQuery(() => db.templates.filter((t) => !t.deletedAt && !t.archived).toArray(), [])
+  const activeWorkout = useLiveQuery(async () => ((await db.meta.get('activeWorkout'))?.value as ID | undefined) ?? null, [])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
   const catName = useMemo(() => new Map(categories?.map((c) => [c.id, c.name])), [categories])
 
-  if (!entries || firstDay === undefined || !targets || !weights || checkin === undefined) return null
+  if (!entries || firstDay === undefined || !targets || !weights || checkin === undefined || !templates || activeWorkout === undefined) return null
 
   const todays = entries
     .filter((e) => e.localDate === today && !e.deletedAt)
@@ -49,6 +53,8 @@ export function Today() {
         <span className="eyebrow">{formatLongDate(today)}</span>
         <h1>Today</h1>
       </header>
+
+      {!activeWorkout && <PlannedWorkout entries={entries} templates={templates} today={today} />}
 
       <CaloriesCard entries={entries} today={today} targets={targets} />
 
@@ -305,6 +311,55 @@ function BodyTiles({
         onClick={() => openSheet({ kind: 'weight' })}
       />
       <Tile domain="activity" value={actValue} note={actNote} onClick={() => openSheet({ kind: 'activity' })} />
+      <WorkoutTile entries={entries} today={today} targets={targets} />
+    </div>
+  )
+}
+
+function WorkoutTile({ entries, today, targets }: { entries: Entry[]; today: LocalDate; targets: Target[] }) {
+  const week = workoutsInWeek(entries, weekStart(today))
+  const target = targetOn(targets, 'workouts_week', today)
+  const doneToday = finishedWorkouts(entries).find((w) => w.localDate === today)
+  const mins = doneToday ? durationMin(doneToday) : null
+  return (
+    <Tile
+      domain="workout"
+      value={target != null ? `${week} / ${target}` : String(week)}
+      note={doneToday ? `${doneToday.title}${mins != null ? ` · ${formatDuration(mins)}` : ''}` : week === 1 && target == null ? 'workout this week' : 'this week'}
+      onClick={() => navigate('/training')}
+    />
+  )
+}
+
+/** "Pull Day · Start" for templates planned today that haven't been done today. */
+function PlannedWorkout({ entries, templates, today }: { entries: Entry[]; templates: WorkoutTemplate[]; today: LocalDate }) {
+  const doneToday = new Set(finishedWorkouts(entries).flatMap((w) => (w.localDate === today && w.workout!.templateId ? [w.workout!.templateId] : [])))
+  const planned = templatesOn(templates, weekdayOf(today)).filter((t) => !doneToday.has(t.id))
+  if (!planned.length) return null
+  const t = planned[0]
+  return (
+    <div className="block planned" style={tintStyle('workout')}>
+      <div className="planned-row">
+        <IconChip name="workout" tint={DOMAIN.workout.tint} size="md" />
+        <div className="grow">
+          <p className="planned-name">{t.name}</p>
+          <p className="row-sub">
+            Planned today · {t.exercises.length} {t.exercises.length === 1 ? 'exercise' : 'exercises'}
+            {planned.length > 1 ? ` · +${planned.length - 1} more` : ''}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary btn-small"
+          onClick={async () => {
+            await startWorkout(t)
+            navigate('/workout')
+          }}
+        >
+          <Icon name="play" size={16} />
+          Start
+        </button>
+      </div>
     </div>
   )
 }

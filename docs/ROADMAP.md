@@ -36,7 +36,8 @@ Decided 2026-10-03 by the user: build everything now instead of phase-by-phase u
    USDA FoodData Central skipped for now (needs an API key). Food items: `item.food` + optional `item.money`;
    `logItem` must log the nutrition facet (TODO in repo.ts). Today: Calories x / target bar + protein.
    `/nutrition` day detail: all nutrients, show "incomplete" when any entry's value is unknown.
-4. **Training** — default exercise library seeded after first pull (flag `initialized:exercises`, like
+4. ~~**Training**~~ — done (templates in `/me/training`, Workout Mode with previous/tap-to-copy/placeholders, resume bar,
+   discard + Undo, summary with Δ + PRs, `/training` history + per-exercise e1RM sparkline). Spec: default exercise library seeded after first pull (flag `initialized:exercises`, like
    categories), templates (exercises + sets/reps + weekdays), **Workout Mode** at `/workout` (full screen, no tab
    bar, active workout id in `meta.activeWorkout`, survives reload): previous performance per exercise,
    tap-to-copy last set, ✓ per set, add set/exercise, finish → summary (duration, sets, volume, Δ vs last same
