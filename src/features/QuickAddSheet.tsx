@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo, useState } from 'react'
 import { formatMoney } from '../core/money'
+import { formatNumber } from '../core/numbers'
 import { searchItems } from '../core/recents'
 import type { Item } from '../core/types'
 import { db } from '../data/db'
@@ -18,6 +19,8 @@ import { toast } from '../ui/toast'
 export function QuickAddSheet() {
   const [query, setQuery] = useState('')
   const items = useLiveQuery(() => db.items.toArray(), [])
+  const foods = useLiveQuery(() => db.foods.toArray(), [])
+  const foodById = useMemo(() => new Map(foods?.map((f) => [f.id, f])), [foods])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
   const catName = useMemo(() => new Map(categories?.map((c) => [c.id, c.name])), [categories])
   const list = useMemo(() => (items ? searchItems(items, query, Date.now(), 10) : []), [items, query])
@@ -30,11 +33,22 @@ export function QuickAddSheet() {
   }
 
   function adjust(item: Item) {
-    openSheet({ kind: 'money', prefill: { title: item.name, kind: item.kind } })
+    const food = item.food && foodById.get(item.food.foodId)
+    if (item.kind === 'food') openSheet(food ? { kind: 'food', food } : { kind: 'food', query: item.name })
+    else openSheet({ kind: 'money', prefill: { title: item.name, kind: item.kind } })
+  }
+
+  /** Price if it has one; otherwise a food's calories for its usual portion. */
+  function sideLabel(item: Item): string | null {
+    if (item.money) return formatMoney(item.money.amount, item.money.currency)
+    const food = item.food && foodById.get(item.food.foodId)
+    if (food?.kcal != null && item.food) return `${formatNumber((food.kcal * item.food.grams) / 100, 0)} kcal`
+    return null
   }
 
   const q = query.trim()
   const actions: { domain: DomainKey; open: () => void }[] = [
+    { domain: 'food', open: () => openSheet({ kind: 'food', query: q || undefined }) },
     { domain: 'expense', open: () => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q || undefined } }) },
     { domain: 'income', open: () => openSheet({ kind: 'money', prefill: { kind: 'income', title: q || undefined } }) },
     { domain: 'sleep', open: () => openSheet({ kind: 'sleep' }) },
@@ -86,9 +100,9 @@ export function QuickAddSheet() {
                       : 'Expense'}
               </span>
             </button>
-            {item.money && (
+            {sideLabel(item) && (
               <button type="button" className="row-side num" aria-label={`Change amount for ${item.name}`} onClick={() => adjust(item)}>
-                {formatMoney(item.money.amount, item.money.currency)}
+                {sideLabel(item)}
               </button>
             )}
           </li>

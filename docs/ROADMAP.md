@@ -26,7 +26,9 @@ Decided 2026-10-03 by the user: build everything now instead of phase-by-phase u
    minutes, km, steps), evening Check-in sheet (mood, energy, stress, productivity, note; one row per day).
    Today blocks: Sleep (last night vs 30-day avg), Weight (latest, Δ vs ~7 days), Activity, check-in prompt
    in the evening if not done. Quick Add gets the new actions.
-3. **Nutrition** — Foods library (per 100 g/ml, servings, `null` = unknown), custom/Albanian foods, recipes
+3. ~~**Nutrition**~~ — done (Food sheet: recents → my foods → OFF search → create; scan + manual barcode;
+   servings × count; price → money facet; food editor per 100 or per serving; recipes; `/nutrition`; `/me/foods`).
+   Spec: Foods library (per 100 g/ml, servings, `null` = unknown), custom/Albanian foods, recipes
    (food with `ingredients`, nutrients computed), Food sheet (search recents → my foods → Open Food Facts;
    grams or serving; optional price → also a money facet = the Red Bull case), barcode via Open Food Facts
    (`/api/v2/product/{code}.json`, no key). Scanning: iOS Safari has no `BarcodeDetector` → use the

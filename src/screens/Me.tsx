@@ -29,6 +29,7 @@ export function Me() {
   const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').filter((c) => !c.deletedAt).toArray(), [])
   const items = useLiveQuery(() => db.items.filter((i) => !i.deletedAt).toArray(), [])
   const pending = useLiveQuery(() => db.outbox.count(), [])
+  const foodCount = useLiveQuery(() => db.foods.filter((f) => !f.deletedAt && !f.archived).count(), [])
   const [newCat, setNewCat] = useState('')
 
   const setTargets = targets ? TARGET_DEFS.filter((d) => targetOn(targets, d.key, today) != null) : []
@@ -59,6 +60,7 @@ export function Me() {
 
       <section className="settings-group with-icons" aria-label="Setup">
         <NavRow icon="target" tint={DOMAIN.plan.tint} label="Targets" trail={targetsTrail} onClick={() => navigate('/me/targets')} />
+        <NavRow icon="food" tint={DOMAIN.food.tint} label="Foods & recipes" trail={foodCount ? `${foodCount}` : undefined} onClick={() => navigate('/me/foods')} />
       </section>
 
       <section className="group" aria-labelledby="cat-set">

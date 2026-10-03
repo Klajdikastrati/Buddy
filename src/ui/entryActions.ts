@@ -5,7 +5,8 @@ import { toast } from './toast'
 
 /** Open the editor that owns an entry's facets. */
 export function openEntry(entry: Entry) {
-  if (entry.sleep) openSheet({ kind: 'sleep', entry })
+  if (entry.nutrition) openSheet({ kind: 'food', entry })
+  else if (entry.sleep) openSheet({ kind: 'sleep', entry })
   else if (entry.measurement) openSheet({ kind: 'weight', entry })
   else if (entry.activity) openSheet({ kind: 'activity', entry })
   else if (entry.money) openSheet({ kind: 'money', entry })

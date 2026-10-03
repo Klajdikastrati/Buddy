@@ -171,3 +171,18 @@ export function SubHead({ title, back, action }: { title: string; back: () => vo
     </header>
   )
 }
+
+/** ‹ Day › switcher; never goes past today. */
+export function DaySwitcher({ label, onPrev, onNext, canNext }: { label: string; onPrev: () => void; onNext: () => void; canNext: boolean }) {
+  return (
+    <div className="day-switcher">
+      <button type="button" className="icon-btn" aria-label="Previous day" onClick={onPrev}>
+        <Icon name="chevronLeft" size={18} strokeWidth={2.2} />
+      </button>
+      <span className="day-switcher-label">{label}</span>
+      <button type="button" className="icon-btn" aria-label="Next day" onClick={onNext} disabled={!canNext}>
+        <Icon name="chevronRight" size={18} strokeWidth={2.2} />
+      </button>
+    </div>
+  )
+}

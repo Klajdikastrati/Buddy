@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import type { Entry, EntryKind, LocalDate } from '../core/types'
+import type { FoodDraft } from '../core/nutrition'
+import type { Entry, EntryKind, Food, LocalDate } from '../core/types'
 
 /** Which sheet is open, app-wide. Kept outside React so any screen can open one. */
 export type SheetState =
@@ -10,6 +11,11 @@ export type SheetState =
   | { kind: 'weight'; entry?: Entry }
   | { kind: 'activity'; entry?: Entry }
   | { kind: 'checkin'; date?: LocalDate }
+  /** Log food: pick (search · scan · create) → amount. `food` skips straight to the amount. */
+  | { kind: 'food'; entry?: Entry; food?: Food; query?: string }
+  /** Create/edit a food; `logAfter` continues into logging it. */
+  | { kind: 'food-edit'; food?: Food; draft?: Partial<FoodDraft>; logAfter?: boolean }
+  | { kind: 'recipe'; food?: Food }
 
 let state: SheetState = { kind: 'none' }
 const listeners = new Set<() => void>()

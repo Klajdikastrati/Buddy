@@ -1,4 +1,11 @@
-import { NUTRIENT_KEYS, type Food, type ID, type Nutrients } from './types'
+import { frecency, normalizeName } from './recents'
+import { NUTRIENT_KEYS, type Entry, type Food, type ID, type LocalDate, type Nutrients, type Synced } from './types'
+
+/** What a food editor or an Open Food Facts lookup provides. */
+export type FoodDraft = Omit<Food, keyof Synced | 'favorite' | 'useCount' | 'lastUsedAt' | 'archived'>
+
+/** "g" or "ml" — what amounts of this food are measured in. */
+export const unitOf = (f: Pick<Food, 'basis'>) => (f.basis === '100ml' ? 'ml' : 'g')
 
 export const emptyNutrients = (): Nutrients =>
   Object.fromEntries(NUTRIENT_KEYS.map((k) => [k, null])) as unknown as Nutrients
@@ -64,3 +71,36 @@ export function recipePer100(ingredients: { foodId: ID; grams: number }[], foods
 }
 
 export const recipeGrams = (ingredients: { grams: number }[]) => ingredients.reduce((t, i) => t + i.grams, 0)
+
+/** Local food search: name or brand contains the query; prefix matches, then most used. */
+export function searchFoods(foods: Food[], query: string, now: number, limit = 20): Food[] {
+  const q = normalizeName(query)
+  const live = foods.filter((f) => !f.deletedAt && !f.archived)
+  if (!q) return live.filter((f) => f.useCount > 0).sort((a, b) => frecency(b, now) - frecency(a, now)).slice(0, limit)
+  return live
+    .filter((f) => normalizeName(`${f.name} ${f.brand ?? ''}`).includes(q))
+    .sort((a, b) => {
+      const pa = normalizeName(a.name).startsWith(q) ? 1 : 0
+      const pb = normalizeName(b.name).startsWith(q) ? 1 : 0
+      return pb - pa || frecency(b, now) - frecency(a, now) || a.name.localeCompare(b.name)
+    })
+    .slice(0, limit)
+}
+
+export interface DayNutrition extends NutrientTotals {
+  entries: Entry[]
+}
+
+/** Everything eaten on a day (entries with a nutrition facet). */
+export function nutritionOn(entries: Entry[], day: LocalDate): DayNutrition {
+  const eaten = entries.filter((e) => !e.deletedAt && e.localDate === day && e.nutrition)
+  return { ...sumNutrients(eaten.map((e) => e.nutrition!)), entries: eaten }
+}
+
+/** Per-100 values recovered from a logged snapshot (for editing an entry whose food is gone). */
+export function per100FromSnapshot(n: Nutrients & { grams: number | null }): Nutrients {
+  const out = emptyNutrients()
+  if (!n.grams) return out
+  for (const k of NUTRIENT_KEYS) out[k] = n[k] == null ? null : round1((n[k]! * 100) / n.grams)
+  return out
+}

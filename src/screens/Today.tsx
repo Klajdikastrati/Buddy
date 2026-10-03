@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { ACTIVITY_LABEL, activityOn, sleepSummary, weightSummary } from '../core/body'
 import { addDays, formatDuration, formatLongDate, formatShortDate, hourIn, monthStart } from '../core/dates'
 import { formatMoney, moneySummary } from '../core/money'
+import { nutritionOn } from '../core/nutrition'
 import { formatNumber } from '../core/numbers'
 import { targetOn } from '../core/targets'
 import type { DayCheckin, Entry, LocalDate, Target } from '../core/types'
@@ -13,6 +14,7 @@ import { openEntry } from '../ui/entryActions'
 import { EntryRow } from '../ui/EntryRow'
 import { navigate, useSettings, useToday } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
+import { Ring } from '../ui/Ring'
 import { openSheet } from '../ui/sheets'
 
 /** After this hour (local) Today asks for the day's check-in if it's missing. */
@@ -47,6 +49,8 @@ export function Today() {
         <span className="eyebrow">{formatLongDate(today)}</span>
         <h1>Today</h1>
       </header>
+
+      <CaloriesCard entries={entries} today={today} targets={targets} />
 
       <MoneyBlock entries={entries} today={today} targets={targets} firstDay={firstDay} currency={settings.currency} />
 
@@ -141,6 +145,56 @@ function MoneyBlock({
 }
 
 const tintStyle = (d: DomainKey) => ({ '--tint': DOMAIN[d].tint }) as React.CSSProperties
+
+/** Calories vs target as a ring, protein as a bar. Taps through to the day's nutrition. */
+function CaloriesCard({ entries, today, targets }: { entries: Entry[]; today: LocalDate; targets: Target[] }) {
+  const d = nutritionOn(entries, today)
+  const kcal = d.totals.kcal ?? 0
+  const target = targetOn(targets, 'kcal_daily', today)
+  const protein = d.totals.proteinG
+  const proteinTarget = targetOn(targets, 'protein_daily', today)
+  const gap = (n: number) => `${d.unknown.kcal ? '≥' : ''}${formatNumber(n, 0)}`
+  return (
+    <button type="button" className="block" onClick={() => navigate('/nutrition')} style={tintStyle('food')}>
+      <CardHead domain="food" label="Calories" chevron />
+      <div className="cal-row">
+        {target != null && (
+          <Ring value={kcal} max={target} size={76} stroke={10} tint={DOMAIN.food.tint} label={`${formatNumber(kcal, 0)} of ${formatNumber(target, 0)} kcal`}>
+            <span className="ring-pct num">{Math.round((kcal / target) * 100)}%</span>
+          </Ring>
+        )}
+        <div className="grow">
+          <p className="stat">
+            <span className="stat-value num">{gap(kcal)}</span>
+            <span className="stat-unit">{target != null ? `/ ${formatNumber(target, 0)} kcal` : 'kcal'}</span>
+          </p>
+          <p className="stat-note num">
+            {d.count === 0
+              ? 'Nothing logged yet'
+              : target == null
+                ? `${d.count} ${d.count === 1 ? 'item' : 'items'} today`
+                : kcal <= target
+                  ? `${formatNumber(target - kcal, 0)} left`
+                  : `${formatNumber(kcal - target, 0)} over`}
+            {d.unknown.kcal > 0 && ` · ${d.unknown.kcal} without kcal`}
+          </p>
+        </div>
+      </div>
+      {(protein != null || proteinTarget != null) && (
+        <div className="month">
+          <div className="month-line">
+            <span>Protein</span>
+            <span className="num">
+              {protein == null ? '—' : `${d.unknown.proteinG ? '≥' : ''}${formatNumber(protein, 0)} g`}
+              {proteinTarget != null && <span className="muted"> / {formatNumber(proteinTarget, 0)} g</span>}
+            </span>
+          </div>
+          {proteinTarget != null && <Bar value={protein ?? 0} max={proteinTarget} label="Protein vs target" />}
+        </div>
+      )}
+    </button>
+  )
+}
 
 /** Domain icon + name heading a Today card. */
 export function CardHead({ id, domain, label, chevron }: { id?: string; domain: DomainKey; label?: string; chevron?: boolean }) {

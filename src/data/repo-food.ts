@@ -1,10 +1,9 @@
-import { recipeGrams, recipePer100, scaleNutrients } from '../core/nutrition'
-import type { Food, ID, Instant, Item, Serving, Synced } from '../core/types'
+import { recipeGrams, recipePer100, scaleNutrients, type FoodDraft } from '../core/nutrition'
+import type { Food, ID, Instant, Item, Serving } from '../core/types'
 import { db } from './db'
 import { created, dayOf, entryRow, getSettings, now, patch, put, rememberItem, save } from './repo-base'
 
-/** What a food editor or Open Food Facts lookup provides. */
-export type FoodDraft = Omit<Food, keyof Synced | 'favorite' | 'useCount' | 'lastUsedAt' | 'archived'>
+export type { FoodDraft }
 
 export function saveFood(draft: FoodDraft, existing?: Food): Promise<Food> {
   const t = now()
@@ -113,4 +112,28 @@ export async function logFoodItem(item: Item): Promise<ID> {
     occurredAt: now(),
     note: null,
   })
+}
+
+/**
+ * Keep a food picked from Open Food Facts: reuse the local copy for that
+ * barcode if there is one, otherwise save the draft.
+ */
+export async function adoptFood(draft: FoodDraft): Promise<Food> {
+  if (draft.sourceId) {
+    const existing = await db.foods
+      .where('barcode')
+      .equals(draft.sourceId)
+      .filter((f) => !f.deletedAt)
+      .first()
+    if (existing) return existing.archived ? updateFood(existing, { archived: false }) : existing
+  }
+  return saveFood(draft)
+}
+
+export async function foodByBarcode(code: string): Promise<Food | undefined> {
+  return db.foods
+    .where('barcode')
+    .equals(code)
+    .filter((f) => !f.deletedAt)
+    .first()
 }

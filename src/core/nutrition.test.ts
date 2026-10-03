@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { emptyNutrients, recipePer100, scaleNutrients, sumNutrients } from './nutrition'
+import { emptyNutrients, nutritionOn, recipePer100, scaleNutrients, searchFoods, sumNutrients } from './nutrition'
+import { foodFromOff } from './off'
 import { targetHistory, targetOn } from './targets'
-import type { Food, Nutrients, Target } from './types'
+import type { Entry, Food, Nutrients, Target } from './types'
 
 const n = (v: Partial<Nutrients>): Nutrients => ({ ...emptyNutrients(), ...v })
 
@@ -70,5 +71,75 @@ describe('targets', () => {
 
   it('lists history newest first', () => {
     expect(targetHistory(rows, 'protein_daily').map((x) => x.value)).toEqual([150, 120])
+  })
+})
+
+describe('Open Food Facts mapping', () => {
+  // Real response for 9002490100070 (Red Bull 250 ml), trimmed. Note sodium_100g = 40 "g" — a data-entry error.
+  const redBull = {
+    code: '9002490100070',
+    product_name: 'Red Bull',
+    brands: 'Red Bull GmbH',
+    quantity: '250ml',
+    product_quantity: 250,
+    product_quantity_unit: 'ml',
+    serving_size: '250ml',
+    serving_quantity: 250,
+    nutriments: {
+      'energy-kcal_100g': 46,
+      proteins_100g: 0,
+      carbohydrates_100g: 11,
+      sugars_100g: 11,
+      fat_100g: 0,
+      'saturated-fat_100g': 0,
+      fiber_100g: 0,
+      salt_100g: 0.1,
+      sodium_100g: 40,
+      caffeine_100g: 0.032,
+    },
+  }
+
+  it('maps a liquid product per 100 ml with plausible sodium and caffeine in mg', () => {
+    const f = foodFromOff(redBull)!
+    expect(f).toMatchObject({ name: 'Red Bull', brand: 'Red Bull GmbH', basis: '100ml', barcode: '9002490100070', source: 'off' })
+    expect(f.kcal).toBe(46)
+    expect(f.sodiumMg).toBe(40) // from salt, not the bogus 40 g sodium
+    expect(f.caffeineMg).toBe(32)
+    expect(f.servings).toEqual([{ label: '1 serving (250ml)', grams: 250 }]) // pack = serving → listed once
+  })
+
+  it('keeps missing or impossible values unknown and converts kJ', () => {
+    const f = foodFromOff({ code: '1', product_name: 'Byrek', quantity: '500 g', product_quantity: '500', nutriments: { 'energy-kj_100g': 1255, proteins_100g: 120, fat_100g: '14.5' } })!
+    expect(f.basis).toBe('100g')
+    expect(f.kcal).toBe(300)
+    expect(f.proteinG).toBeNull() // 120 g per 100 g is impossible
+    expect(f.fatG).toBe(14.5)
+    expect(f.fiberG).toBeNull()
+    expect(f.servings).toEqual([{ label: 'Whole pack (500 g)', grams: 500 }])
+    expect(foodFromOff({ code: '2', product_name: '  ' })).toBeNull()
+    expect(foodFromOff({ code: '3', product_name: 'Cola', serving_size: '1 portion (330 ml)', serving_quantity: 330 })!.servings[0].label).toBe(
+      '1 portion (330 ml)',
+    )
+  })
+})
+
+describe('food search and day totals', () => {
+  const food = (name: string, useCount: number, extra: Partial<Food> = {}) =>
+    ({ id: name, name, brand: null, useCount, lastUsedAt: useCount ? '2026-10-01T00:00:00Z' : null, archived: false, deletedAt: null, ...extra }) as Food
+  const foods = [food('Greek yogurt', 2), food('Yogurt drink', 9), food('Bread', 0, { brand: 'Yogurtland' }), food('Old yogurt', 50, { archived: true })]
+
+  it('ranks prefix matches first, then frequent; ignores archived', () => {
+    const now = Date.parse('2026-10-03T00:00:00Z')
+    expect(searchFoods(foods, 'yog', now).map((f) => f.name)).toEqual(['Yogurt drink', 'Greek yogurt', 'Bread'])
+    expect(searchFoods(foods, '', now).map((f) => f.name)).toEqual(['Yogurt drink', 'Greek yogurt'])
+  })
+
+  it('sums only the day’s food entries', () => {
+    const entry = (localDate: string, kcal: number | null, deleted = false) =>
+      ({ localDate, deletedAt: deleted ? 'x' : null, nutrition: { ...n({ kcal }), foodId: null, grams: 100, servingLabel: null } }) as unknown as Entry
+    const day = nutritionOn([entry('2026-10-03', 200), entry('2026-10-03', null), entry('2026-10-03', 500, true), entry('2026-10-02', 900)], '2026-10-03')
+    expect(day.totals.kcal).toBe(200)
+    expect(day.unknown.kcal).toBe(1)
+    expect(day.entries).toHaveLength(2)
   })
 })

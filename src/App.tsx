@@ -3,14 +3,19 @@ import { ensureDefaults } from './data/repo'
 import { startAutoSync, syncNow } from './data/sync'
 import { ActivitySheet } from './features/ActivitySheet'
 import { CheckinSheet } from './features/CheckinSheet'
+import { FoodEditorSheet } from './features/FoodEditorSheet'
+import { FoodSheet } from './features/FoodSheet'
 import { MoneySheet } from './features/MoneySheet'
 import { QuickAddSheet } from './features/QuickAddSheet'
+import { RecipeSheet } from './features/RecipeSheet'
 import { SleepSheet } from './features/SleepSheet'
 import { WeightSheet } from './features/WeightSheet'
 import { History } from './screens/History'
 import { Login } from './screens/Login'
 import { Me } from './screens/Me'
+import { MeFoods } from './screens/MeFoods'
 import { MeTargets } from './screens/MeTargets'
+import { Nutrition } from './screens/Nutrition'
 import { Today } from './screens/Today'
 import { navigate, useKeyboardInset, usePath, useSession } from './ui/hooks'
 import { Icon, type IconName } from './ui/icons'
@@ -35,6 +40,8 @@ const ROUTES: Record<string, () => React.ReactNode> = {
   '/history': History,
   '/me': Me,
   '/me/targets': MeTargets,
+  '/me/foods': MeFoods,
+  '/nutrition': Nutrition,
 }
 
 export default function App() {
@@ -99,6 +106,9 @@ function Shell({ userId }: { userId: string }) {
       {sheet.kind === 'weight' && <WeightSheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} />}
       {sheet.kind === 'activity' && <ActivitySheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} />}
       {sheet.kind === 'checkin' && <CheckinSheet key={sheet.date ?? 'today'} date={sheet.date} />}
+      {sheet.kind === 'food' && <FoodSheet key={sheet.entry?.id ?? sheet.food?.id ?? 'new'} entry={sheet.entry} food={sheet.food} query={sheet.query} />}
+      {sheet.kind === 'food-edit' && <FoodEditorSheet key={sheet.food?.id ?? 'new'} food={sheet.food} draft={sheet.draft} logAfter={sheet.logAfter} />}
+      {sheet.kind === 'recipe' && <RecipeSheet key={sheet.food?.id ?? 'new'} food={sheet.food} />}
       <Toaster />
     </>
   )
