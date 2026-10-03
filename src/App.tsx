@@ -24,6 +24,7 @@ import { WeightSheet } from './features/WeightSheet'
 import { History } from './screens/History'
 import { Login } from './screens/Login'
 import { Me } from './screens/Me'
+import { MeAnalyst } from './screens/MeAnalyst'
 import { MeFoods } from './screens/MeFoods'
 import { MeTargets } from './screens/MeTargets'
 import { MeTrackers } from './screens/MeTrackers'
@@ -65,6 +66,7 @@ const ROUTES: Record<string, () => React.ReactNode> = {
   '/training': Training,
   '/me/training': MeTraining,
   '/me/trackers': MeTrackers,
+  '/me/analyst': MeAnalyst,
   '/workout': Workout,
 }
 

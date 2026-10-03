@@ -288,7 +288,12 @@ function SetRow({
   const phW = prevSet?.weightKg ?? above?.weightKg ?? null
   const phR = prevSet?.reps ?? above?.reps ?? templateReps ?? null
 
-  const parsed = () => ({ weightKg: parseDecimal(w), reps: r.trim() ? Math.round(Number(r)) || null : null })
+  // Server bounds: reps 0–1000, weight ≥ 0. A rejected row would block sync, so clamp here.
+  const parsed = () => {
+    const n = Math.round(Number(r))
+    const weightKg = parseDecimal(w)
+    return { weightKg: weightKg == null ? null : Math.min(weightKg, 9999), reps: r.trim() && Number.isFinite(n) && n > 0 ? Math.min(n, 1000) : null }
+  }
 
   function commit() {
     const v = parsed()

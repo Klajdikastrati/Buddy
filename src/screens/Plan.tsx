@@ -51,7 +51,7 @@ export function Plan() {
             setDraft('')
           }}
         >
-          <input className="input grow" autoComplete="off" placeholder="Add a task for today…" aria-label="New task for today" value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <input className="input grow" autoComplete="off" maxLength={200} placeholder="Add a task for today…" aria-label="New task for today" value={draft} onChange={(e) => setDraft(e.target.value)} />
           <button type="submit" className="btn btn-quiet" disabled={!draft.trim()}>
             Add
           </button>

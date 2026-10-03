@@ -94,7 +94,7 @@ function RecipeForm({ food, foods }: { food?: Food; foods: Food[] }) {
       >
         <label className="field">
           <span className="field-label">Name</span>
-          <input className="input" autoComplete="off" placeholder="Tavë kosi" data-autofocus={food ? undefined : ''} value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" autoComplete="off" maxLength={160} placeholder="Tavë kosi" data-autofocus={food ? undefined : ''} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
 
         <fieldset className="field">

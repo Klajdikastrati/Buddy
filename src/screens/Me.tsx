@@ -33,6 +33,7 @@ export function Me() {
   const pending = useLiveQuery(() => db.outbox.count(), [])
   const foodCount = useLiveQuery(() => db.foods.filter((f) => !f.deletedAt && !f.archived).count(), [])
   const trackerCount = useLiveQuery(() => db.trackers.filter((t) => !t.deletedAt && !t.archived).count(), [])
+  const pendingRecs = useLiveQuery(() => db.recommendations.where('status').equals('pending').filter((r) => !r.deletedAt).count(), [])
   const [newCat, setNewCat] = useState('')
 
   const setTargets = targets ? TARGET_DEFS.filter((d) => targetOn(targets, d.key, today) != null) : []
@@ -71,6 +72,13 @@ export function Me() {
         </h2>
         <div className="settings-group with-icons">
           <NavRow icon="upload" tint={DOMAIN.analyst.tint} label="Export for Analyst" onClick={() => openSheet({ kind: 'analyst-export' })} />
+          <NavRow
+            icon="sparkle"
+            tint={DOMAIN.analyst.tint}
+            label="Analyses & proposals"
+            trail={pendingRecs ? `${pendingRecs} to review` : undefined}
+            onClick={() => navigate('/me/analyst')}
+          />
         </div>
       </section>
 
@@ -102,7 +110,7 @@ export function Me() {
           <input
             className="input grow"
             autoComplete="off"
-            placeholder="New category…"
+            maxLength={60} placeholder="New category…"
             aria-label="New category name"
             value={newCat}
             onChange={(e) => setNewCat(e.target.value)}

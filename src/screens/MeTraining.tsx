@@ -75,8 +75,8 @@ export function MeTraining() {
             setMuscle('')
           }}
         >
-          <input className="input grow" autoComplete="off" placeholder="New exercise…" aria-label="Exercise name" value={name} onChange={(e) => setName(e.target.value)} />
-          <input className="input w-110" autoComplete="off" placeholder="Muscle" aria-label="Muscle group" value={muscle} onChange={(e) => setMuscle(e.target.value)} />
+          <input className="input grow" autoComplete="off" maxLength={80} placeholder="New exercise…" aria-label="Exercise name" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input w-110" autoComplete="off" maxLength={40} placeholder="Muscle" aria-label="Muscle group" value={muscle} onChange={(e) => setMuscle(e.target.value)} />
           <button type="submit" className="btn btn-quiet">
             Add
           </button>

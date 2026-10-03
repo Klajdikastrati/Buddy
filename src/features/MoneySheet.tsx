@@ -156,6 +156,7 @@ export function MoneySheet({ entry, prefill }: Props) {
           <input
             className="input"
             autoComplete="off"
+            maxLength={120}
             placeholder={kind === 'income' ? 'Salary…' : 'Red Bull, taxi, groceries…'}
             value={title}
             onChange={(e) => setTitle(e.target.value)}

@@ -75,6 +75,7 @@ export function PlanItemSheet({ item, planKind }: { item?: PlanItem; planKind?: 
           <input
             className="input"
             autoComplete="off"
+            maxLength={200}
             data-autofocus={item ? undefined : ''}
             placeholder={kind === 'goal' ? 'Train 4 times' : kind === 'routine' ? 'Stretch 10 min' : 'Call the bank'}
             value={title}

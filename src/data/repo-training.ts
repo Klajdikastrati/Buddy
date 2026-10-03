@@ -18,7 +18,7 @@ export async function ensureExerciseLibrary() {
 }
 
 export function addExercise(name: string, muscle: string | null): Promise<Exercise> {
-  return save<Exercise>('exercises', { ...created(), name: name.trim(), muscle: muscle?.trim() || null, archived: false })
+  return save<Exercise>('exercises', { ...created(), name: name.trim().slice(0, 80), muscle: muscle?.trim().slice(0, 40) || null, archived: false })
 }
 
 export function updateExercise(e: Exercise, changes: Partial<Pick<Exercise, 'name' | 'muscle' | 'archived'>>) {

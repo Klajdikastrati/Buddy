@@ -84,7 +84,7 @@ export function TrackerDefSheet({ def }: { def?: TrackerDef }) {
       >
         <label className="field">
           <span className="field-label">Name</span>
-          <input className="input" autoComplete="off" placeholder="Water, Reading, Meditation…" data-autofocus={def ? undefined : ''} value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" autoComplete="off" maxLength={60} placeholder="Water, Reading, Meditation…" data-autofocus={def ? undefined : ''} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         {fields.map((f, i) => (
           <div key={i} className="field tracker-field">

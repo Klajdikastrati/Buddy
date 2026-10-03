@@ -144,7 +144,7 @@ export function FoodEditorSheet({ food, draft, logAfter }: { food?: Food; draft?
       >
         <label className="field">
           <span className="field-label">Name</span>
-          <input className="input" autoComplete="off" data-autofocus={name ? undefined : ''} placeholder="Byrek me spinaq" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" autoComplete="off" data-autofocus={name ? undefined : ''} maxLength={160} placeholder="Byrek me spinaq" value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         <label className="field">
           <span className="field-label">Brand · optional</span>

@@ -53,7 +53,7 @@ Decided 2026-10-03 by the user: build everything now instead of phase-by-phase u
 7. ~~**Analyst export**~~ — done (share sheet or download; contract in DATA_MODEL.md). Spec: Me → Export for Analyst (30/90/365 days) → one `buddy-export-v1.json`: profile, targets
    + history, daily series, entries, foods used, workouts+sets, check-ins, data quality (missing days,
    unknown nutrients), signals. Pure builder in `src/core/export.ts` with tests.
-8. **Analyst import** — Me → Analyst: pick `buddy-analysis.json`, validate strictly (`src/core/analyst.ts`),
+8. ~~**Analyst import**~~ — done (strict validator lists every error with a path; duplicates refused; stale proposals can only be dismissed). Spec: Me → Analyst: pick `buddy-analysis.json`, validate strictly (`src/core/analyst.ts`),
    store run + recommendations; review each proposed change (Current → Suggested · reason · Apply / Keep current).
    Only allow-listed target keys with bounds; mark `stale` if current value differs; Apply writes a target with
    `source='analyst'` + `recommendationId`. Target history list in Me. Insights/warnings read-only. No chat UI.

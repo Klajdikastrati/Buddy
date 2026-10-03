@@ -92,7 +92,7 @@ export function TemplateSheet({ template }: { template?: WorkoutTemplate }) {
       >
         <label className="field">
           <span className="field-label">Name</span>
-          <input className="input" autoComplete="off" placeholder="Pull Day" data-autofocus={template ? undefined : ''} value={name} onChange={(e) => setName(e.target.value)} />
+          <input className="input" autoComplete="off" maxLength={80} placeholder="Pull Day" data-autofocus={template ? undefined : ''} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
 
         <fieldset className="field">

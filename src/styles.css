@@ -2104,3 +2104,154 @@ section > .row-between {
   box-shadow: var(--shadow-1), var(--highlight);
   padding: 12px;
 }
+
+/* ---- Analyst ---- */
+
+.proposal {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1), var(--highlight);
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proposal .card-head {
+  margin-bottom: 0;
+}
+
+.proposal-change {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.proposal-change svg {
+  color: var(--fg-3);
+}
+
+.proposal-reason {
+  line-height: 1.4;
+}
+
+.proposal.is-stale .proposal-change {
+  opacity: 0.55;
+}
+
+.stale-note {
+  font-size: 14px;
+  color: var(--warn);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+.pill-high {
+  color: var(--positive);
+}
+
+.pill-low {
+  color: var(--fg-3);
+}
+
+.pill-level {
+  background: color-mix(in srgb, var(--c-analyst) 14%, transparent);
+  color: var(--c-analyst);
+}
+
+.error-card {
+  box-shadow: var(--shadow-1), inset 0 0 0 1px color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.error-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--danger);
+  font-weight: 650;
+}
+
+.error-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--fg-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  word-break: break-word;
+}
+
+.run {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1), var(--highlight);
+  overflow: hidden;
+}
+
+.run-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.run-head .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.run-head > svg {
+  color: var(--fg-3);
+  transition: transform 150ms var(--ease);
+}
+
+.run-body {
+  padding: 4px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: inset 0 0.5px 0 var(--line);
+}
+
+.insight {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 10px;
+}
+
+.insight p {
+  flex-basis: 100%;
+  line-height: 1.4;
+}
+
+.advice {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  line-height: 1.4;
+}

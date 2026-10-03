@@ -1,3 +1,4 @@
+import type { Analysis } from '../core/analyst'
 import { targetOn } from '../core/targets'
 import type { AnalystRun, LocalDate, Recommendation, Synced, TargetKey } from '../core/types'
 import { db } from './db'
@@ -57,4 +58,38 @@ export async function applyRecommendation(rec: Recommendation, today: LocalDate)
 
 export function keepCurrent(rec: Recommendation) {
   return patch('recommendations', rec, { status: 'rejected', decidedAt: now() })
+}
+
+/** Put away a proposal that no longer matches the live target (stays `stale`, now decided). */
+export function dismissStale(rec: Recommendation) {
+  return patch('recommendations', rec, { status: 'stale', decidedAt: now() })
+}
+
+/**
+ * Store a validated analysis. The same analysis (by `analysis.id`) can't be
+ * imported twice — its proposals would duplicate.
+ */
+export async function importAnalysis(a: Analysis, today: LocalDate): Promise<{ run: AnalystRun; proposals: number } | 'duplicate'> {
+  const runs = await db.analystRuns.toArray()
+  if (runs.some((r) => !r.deletedAt && (r.payload as Analysis | null)?.analysis?.id === a.analysis.id)) return 'duplicate'
+  const run = await importAnalystRun(
+    {
+      periodFrom: a.analysis.period.from,
+      periodTo: a.analysis.period.to,
+      analystVersion: a.analysis.analyst_version,
+      model: a.analysis.model,
+      payload: a,
+    },
+    a.proposed_changes.map((p) => ({
+      type: p.type,
+      targetKey: p.target_key,
+      currentValue: p.current_value,
+      suggestedValue: p.suggested_value,
+      unit: p.unit,
+      reason: p.reason,
+      confidence: p.confidence,
+    })),
+    today,
+  )
+  return { run, proposals: a.proposed_changes.length }
 }
