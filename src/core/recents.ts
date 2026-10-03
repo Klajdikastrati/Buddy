@@ -1,7 +1,7 @@
 import type { Item } from './types'
 
-/** Frequency decayed by recency: used often *and* lately ranks first. */
-export function frecency(item: Item, now: number): number {
+/** Frequency decayed by recency: used often *and* lately ranks first. Works for items and foods. */
+export function frecency(item: { useCount: number; lastUsedAt: string | null }, now: number): number {
   if (!item.lastUsedAt) return 0
   const days = Math.max(0, (now - Date.parse(item.lastUsedAt)) / 86_400_000)
   return item.useCount / (1 + days / 7)

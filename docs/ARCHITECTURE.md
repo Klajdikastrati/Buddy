@@ -2,7 +2,8 @@
 
 ```text
 src/core/      pure TypeScript domain logic — no React, no storage. Portable to a future native client.
-src/data/      Dexie (IndexedDB) schema + repo (all writes) + sync (Phase 1b)
+src/data/      Dexie (IndexedDB) schema, sync, and all writes: repo-base.ts (put + queue helpers),
+               repo.ts (settings, money, categories, items, targets), repo-<domain>.ts per domain
 src/ui/        hooks, router, Sheet, toast, shared rows
 src/features/  sheets: QuickAdd, Money
 src/screens/   Today, History, Me
@@ -22,7 +23,8 @@ No UI kit, no icon lib, no chart lib, no state lib. Adding a significant depende
 
 ## Data flow
 1. Screen reads Dexie via `useLiveQuery` (re-renders on any local change).
-2. Writes go through `data/repo.ts` only: write row(s) locally + append `{table,rowId}` to `outbox`, in one transaction.
+2. Writes go through `data/repo*.ts` only: write row(s) locally + append `{table,rowId}` to `outbox`, in one
+   transaction (`put`/`save`/`patch` in `repo-base.ts`). Pure calculations live in `core/` and are unit-tested.
 3. (Phase 1b) Sync: push outbox → Supabase `upsert` by client UUID (idempotent); pull rows with
    `updated_at > cursor`. Last-write-wins (single user). Soft deletes (`deletedAt`) sync like any update.
 

@@ -1,30 +1,19 @@
-import { localDateOf } from '../core/dates'
 import { normalizeName } from '../core/recents'
-import type { Category, Entry, EntryKind, ID, Item, LocalDate, Settings, Target, TargetKey } from '../core/types'
+import type { Category, EntryKind, ID, Item, LocalDate, Settings, Target, TargetKey } from '../core/types'
 import { uid } from '../core/uid'
-import { db, DEFAULT_SETTINGS, type SyncTable } from './db'
-import { scheduleSync } from './sync'
+import { db } from './db'
+import { created, dayOf, entryRow, getSettings, now, patch, put, queue, rememberItem, save } from './repo-base'
+import { logFoodItem } from './repo-food'
 
-// Every write goes through here: local first, then queued for sync. Callers
-// never wait on the network.
+// Settings, money, categories, items and targets. Other domains live in
+// repo-<domain>.ts; shared plumbing in repo-base.ts.
 
-const now = () => new Date().toISOString()
+export { getSettings }
 
-async function queue(table: SyncTable, rowId: ID) {
-  await db.outbox.add({ table, rowId, queuedAt: now() })
-  scheduleSync()
-}
-
-export async function getSettings(): Promise<Settings> {
-  const row = await db.meta.get('settings')
-  const { updatedAt: _ignored, ...settings } = (row?.value ?? {}) as Partial<Settings> & { updatedAt?: string }
-  return { ...DEFAULT_SETTINGS, ...settings }
-}
-
-export async function saveSettings(patch: Partial<Settings>) {
+export async function saveSettings(changes: Partial<Settings>) {
   const current = await getSettings()
   await db.transaction('rw', db.meta, db.outbox, async () => {
-    await db.meta.put({ key: 'settings', value: { ...current, ...patch, updatedAt: now() } })
+    await db.meta.put({ key: 'settings', value: { ...current, ...changes, updatedAt: now() } })
     await queue('profiles', 'me')
   })
 }
@@ -48,14 +37,10 @@ export async function ensureDefaults() {
   await db.transaction('rw', db.categories, db.outbox, db.meta, async () => {
     if (await db.meta.get('initialized')) return
     const t = now()
-    if ((await db.categories.count()) > 0) {
-      await db.meta.put({ key: 'initialized', value: t })
-      return
-    }
-    for (const [i, name] of DEFAULT_CATEGORIES.entries()) {
-      const c: Category = { id: uid(), name, sortOrder: i, archived: false, createdAt: t, updatedAt: t, deletedAt: null }
-      await db.categories.add(c)
-      await queue('categories', c.id)
+    if ((await db.categories.count()) === 0) {
+      for (const [i, name] of DEFAULT_CATEGORIES.entries()) {
+        await put<Category>('categories', { ...created(t), name, sortOrder: i, archived: false })
+      }
     }
     await db.meta.put({ key: 'initialized', value: t })
   })
@@ -81,76 +66,40 @@ export interface MoneyInput {
  */
 export async function logMoney(input: MoneyInput, editId?: ID): Promise<ID> {
   const settings = await getSettings()
-  const t = now()
-  const localDate = localDateOf(new Date(input.occurredAt), settings.timezone, settings.rolloverHour)
-  const money = {
-    direction: input.kind === 'income' ? ('in' as const) : ('out' as const),
-    amount: input.amount,
-    currency: settings.currency,
-    categoryId: input.categoryId,
-  }
+  const localDate = await dayOf(input.occurredAt)
+  const money = { amount: input.amount, currency: settings.currency, categoryId: input.categoryId }
 
   return db.transaction('rw', db.entries, db.items, db.outbox, async () => {
     const key = normalizeName(input.title)
-    let item = key
-      ? (await db.items.filter((i) => !i.deletedAt && i.kind === input.kind && normalizeName(i.name) === key).first())
+    const item = key
+      ? await rememberItem(
+          (i) => i.kind === input.kind && normalizeName(i.name) === key,
+          { name: input.title.trim(), kind: input.kind, money },
+          !editId,
+        )
       : undefined
-    const isNewUse = !editId
-    if (item) {
-      item = {
-        ...item,
-        name: input.title.trim(),
-        money: { amount: input.amount, currency: settings.currency, categoryId: input.categoryId },
-        useCount: item.useCount + (isNewUse ? 1 : 0),
-        lastUsedAt: isNewUse ? t : item.lastUsedAt,
-        archived: false,
-        updatedAt: t,
-      }
-      await db.items.put(item)
-      await queue('items', item.id)
-    } else if (key) {
-      item = {
-        id: uid(),
-        name: input.title.trim(),
+    const entry = await entryRow(
+      {
         kind: input.kind,
-        money: { amount: input.amount, currency: settings.currency, categoryId: input.categoryId },
-        useCount: 1,
-        lastUsedAt: t,
-        favorite: false,
-        archived: false,
-        createdAt: t,
-        updatedAt: t,
-        deletedAt: null,
-      }
-      await db.items.add(item)
-      await queue('items', item.id)
-    }
-
-    const existing = editId ? await db.entries.get(editId) : undefined
-    const entry: Entry = {
-      id: existing?.id ?? uid(),
-      kind: input.kind,
-      occurredAt: input.occurredAt,
+        occurredAt: input.occurredAt,
+        itemId: item?.id ?? null,
+        title: input.title.trim() || (input.kind === 'income' ? 'Income' : 'Expense'),
+        note: input.note,
+        money: { direction: input.kind === 'income' ? 'in' : 'out', ...money },
+      },
       localDate,
-      itemId: item?.id ?? null,
-      title: input.title.trim() || (input.kind === 'income' ? 'Income' : 'Expense'),
-      note: input.note?.trim() || null,
-      money,
-      createdAt: existing?.createdAt ?? t,
-      updatedAt: t,
-      deletedAt: null,
-    }
-    await db.entries.put(entry)
-    await queue('entries', entry.id)
+      editId,
+    )
+    await put('entries', entry)
     return entry.id
   })
 }
 
 /** One-tap repeat of an item with its remembered values, at the current time. */
 export async function logItem(item: Item): Promise<ID> {
-  // TODO(phase 3): food items log a nutrition facet (+ money if priced) instead.
+  if (item.kind === 'food') return logFoodItem(item)
   return logMoney({
-    kind: item.kind === 'income' ? 'income' : 'expense',
+    kind: item.kind,
     title: item.name,
     amount: item.money?.amount ?? 0,
     categoryId: item.money?.categoryId ?? null,
@@ -167,53 +116,48 @@ export async function setEntryDeleted(id: ID, deleted: boolean) {
   })
 }
 
-async function touch<T extends { id: ID }>(table: Exclude<SyncTable, 'profiles'>, row: T) {
-  // Dexie's put is typed per table; the tables share the Synced shape.
-  await (db[table] as unknown as { put(r: T): Promise<unknown> }).put(row)
-  await queue(table, row.id)
-}
-
-export async function updateItem(item: Item, patch: Partial<Pick<Item, 'name' | 'favorite' | 'archived'>>) {
-  await db.transaction('rw', db.items, db.outbox, () => touch('items', { ...item, ...patch, updatedAt: now() }))
+export function updateItem(item: Item, changes: Partial<Pick<Item, 'name' | 'favorite' | 'archived'>>) {
+  return patch('items', item, changes)
 }
 
 export async function addCategory(name: string) {
-  const t = now()
-  const count = await db.categories.count()
-  const c: Category = { id: uid(), name: name.trim(), sortOrder: count, archived: false, createdAt: t, updatedAt: t, deletedAt: null }
-  await db.transaction('rw', db.categories, db.outbox, () => touch('categories', c))
+  const sortOrder = await db.categories.count()
+  return save<Category>('categories', { ...created(), name: name.trim(), sortOrder, archived: false })
 }
 
-export async function updateCategory(c: Category, patch: Partial<Pick<Category, 'name' | 'archived'>>) {
-  await db.transaction('rw', db.categories, db.outbox, () => touch('categories', { ...c, ...patch, updatedAt: now() }))
+export function updateCategory(c: Category, changes: Partial<Pick<Category, 'name' | 'archived'>>) {
+  return patch('categories', c, changes)
 }
 
-/** Targets are versioned: a change adds a row effective from `from`. */
-export async function setTarget(key: TargetKey, value: number | null, unit: string, from: LocalDate) {
+/**
+ * Targets are versioned: a change adds a row effective from `from`; `null`
+ * removes the target from that day. Analyst-applied changes carry provenance.
+ */
+export async function setTarget(
+  key: TargetKey,
+  value: number | null,
+  unit: string,
+  from: LocalDate,
+  provenance: { source: Target['source']; recommendationId: ID | null } = { source: 'user', recommendationId: null },
+) {
   const t = now()
   await db.transaction('rw', db.targets, db.outbox, async () => {
     // Replace a same-day change instead of stacking versions.
-    const sameDay = await db.targets.where('key').equals(key).filter((x) => x.effectiveFrom === from && !x.deletedAt).first()
-    const row: Target = {
+    const sameDay = await db.targets
+      .where('key')
+      .equals(key)
+      .filter((x) => x.effectiveFrom === from && !x.deletedAt)
+      .first()
+    await put<Target>('targets', {
       id: sameDay?.id ?? uid(),
       key,
       value: value ?? 0,
       unit,
       effectiveFrom: from,
-      source: 'user',
-      recommendationId: null,
+      ...provenance,
       createdAt: sameDay?.createdAt ?? t,
       updatedAt: t,
       deletedAt: value == null ? t : null,
-    }
-    await touch('targets', row)
+    })
   })
-}
-
-/** Current value of a target on a given day, or null. */
-export function targetOn(targets: Target[], key: TargetKey, day: LocalDate): number | null {
-  const current = targets
-    .filter((x) => x.key === key && x.effectiveFrom <= day)
-    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom) || b.updatedAt.localeCompare(a.updatedAt))[0]
-  return current && !current.deletedAt ? current.value : null
 }
