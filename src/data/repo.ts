@@ -3,24 +3,30 @@ import { normalizeName } from '../core/recents'
 import type { Category, Entry, EntryKind, ID, Item, LocalDate, Settings, Target, TargetKey } from '../core/types'
 import { uid } from '../core/uid'
 import { db, DEFAULT_SETTINGS, type SyncTable } from './db'
+import { scheduleSync } from './sync'
 
 // Every write goes through here: local first, then queued for sync. Callers
 // never wait on the network.
 
 const now = () => new Date().toISOString()
 
-function queue(table: SyncTable, rowId: ID) {
-  return db.outbox.add({ table, rowId, queuedAt: now() })
+async function queue(table: SyncTable, rowId: ID) {
+  await db.outbox.add({ table, rowId, queuedAt: now() })
+  scheduleSync()
 }
 
 export async function getSettings(): Promise<Settings> {
   const row = await db.meta.get('settings')
-  return { ...DEFAULT_SETTINGS, ...(row?.value as Partial<Settings> | undefined) }
+  const { updatedAt: _ignored, ...settings } = (row?.value ?? {}) as Partial<Settings> & { updatedAt?: string }
+  return { ...DEFAULT_SETTINGS, ...settings }
 }
 
 export async function saveSettings(patch: Partial<Settings>) {
   const current = await getSettings()
-  await db.meta.put({ key: 'settings', value: { ...current, ...patch } })
+  await db.transaction('rw', db.meta, db.outbox, async () => {
+    await db.meta.put({ key: 'settings', value: { ...current, ...patch, updatedAt: now() } })
+    await queue('profiles', 'me')
+  })
 }
 
 const DEFAULT_CATEGORIES = [
@@ -34,11 +40,18 @@ const DEFAULT_CATEGORIES = [
   'Other',
 ]
 
-/** First run: sensible defaults instead of a setup wizard. */
+/**
+ * First run: sensible defaults instead of a setup wizard. Call after the first
+ * pull, so a second device adopts the synced categories instead of duplicating.
+ */
 export async function ensureDefaults() {
   await db.transaction('rw', db.categories, db.outbox, db.meta, async () => {
     if (await db.meta.get('initialized')) return
     const t = now()
+    if ((await db.categories.count()) > 0) {
+      await db.meta.put({ key: 'initialized', value: t })
+      return
+    }
     for (const [i, name] of DEFAULT_CATEGORIES.entries()) {
       const c: Category = { id: uid(), name, sortOrder: i, archived: false, createdAt: t, updatedAt: t, deletedAt: null }
       await db.categories.add(c)
@@ -151,7 +164,7 @@ export async function setEntryDeleted(id: ID, deleted: boolean) {
   })
 }
 
-async function touch<T extends { id: ID }>(table: SyncTable, row: T) {
+async function touch<T extends { id: ID }>(table: Exclude<SyncTable, 'profiles'>, row: T) {
   // Dexie's put is typed per table; the tables share the Synced shape.
   await (db[table] as unknown as { put(r: T): Promise<unknown> }).put(row)
   await queue(table, row.id)

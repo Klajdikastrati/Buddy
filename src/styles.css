@@ -481,6 +481,31 @@ select.input-inline {
   border-radius: var(--r-md);
 }
 
+.setting-button {
+  width: 100%;
+  text-align: left;
+  padding-right: 16px;
+}
+
+.setting-button:active {
+  background: var(--surface-2);
+}
+
+.login {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-bottom: calc(var(--safe-b) + 24px);
+}
+
+.login-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+}
+
 /* ---- Tab bar ---- */
 
 .tabbar {

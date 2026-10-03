@@ -1,8 +1,26 @@
+import type { Session } from '@supabase/supabase-js'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { localDateOf } from '../core/dates'
 import type { Settings } from '../core/types'
 import { db, DEFAULT_SETTINGS } from '../data/db'
+import { supabase } from '../data/supabase'
+import { syncStore, type SyncState } from '../data/sync'
+
+/** undefined while reading local storage (instant), then Session | null. */
+export function useSession(): Session | null | undefined {
+  const [session, setSession] = useState<Session | null | undefined>(undefined)
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => data.subscription.unsubscribe()
+  }, [])
+  return session
+}
+
+export function useSyncState(): SyncState {
+  return useSyncExternalStore(syncStore.subscribe, syncStore.get)
+}
 
 export function useSettings(): Settings {
   const row = useLiveQuery(() => db.meta.get('settings'), [])

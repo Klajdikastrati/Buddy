@@ -3,11 +3,23 @@ import { useState } from 'react'
 import { formatMoney, parseAmount } from '../core/money'
 import { db } from '../data/db'
 import { addCategory, saveSettings, setTarget, targetOn, updateCategory, updateItem } from '../data/repo'
-import { useSettings, useToday } from '../ui/hooks'
+import { signOut, syncNow, type SyncState } from '../data/sync'
+import { useSettings, useSyncState, useToday } from '../ui/hooks'
 import { toast } from '../ui/toast'
+
+function syncLabel(s: SyncState, pending: number): string {
+  const waiting = pending ? ` · ${pending} waiting` : ''
+  if (s.status === 'syncing') return 'Syncing…'
+  if (s.status === 'offline') return `Offline${waiting}`
+  if (s.status === 'error') return `Couldn’t sync${waiting} · tap to retry`
+  if (!s.lastSyncedAt) return pending ? `${pending} waiting` : 'Not synced yet'
+  const mins = Math.round((Date.now() - Date.parse(s.lastSyncedAt)) / 60_000)
+  return `Synced ${mins < 1 ? 'just now' : `${mins} min ago`}${waiting}`
+}
 
 export function Me() {
   const settings = useSettings()
+  const sync = useSyncState()
   const today = useToday(settings)
   const targets = useLiveQuery(() => db.targets.toArray(), [])
   const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').filter((c) => !c.deletedAt).toArray(), [])
@@ -173,12 +185,21 @@ export function Me() {
         <h2 id="data-set" className="section-label">
           Data
         </h2>
-        <div className="setting">
+        <button type="button" className="setting setting-button" onClick={() => void syncNow()}>
           <span>Cloud sync</span>
-          <span className="muted">Not connected{pending ? ` · ${pending} changes waiting` : ''}</span>
-        </div>
+          <span className={`muted ${sync.status === 'error' ? 'over' : ''}`}>{syncLabel(sync, pending ?? 0)}</span>
+        </button>
         <button type="button" className="btn btn-quiet full" onClick={() => void exportBackup()}>
           Download backup
+        </button>
+        <button
+          type="button"
+          className="btn btn-quiet full"
+          onClick={async () => {
+            if (!(await signOut())) toast('Some changes haven’t synced yet. Connect to the internet first.')
+          }}
+        >
+          Sign out
         </button>
       </section>
     </div>

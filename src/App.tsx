@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { ensureDefaults } from './data/repo'
+import { startAutoSync, syncNow } from './data/sync'
 import { MoneySheet } from './features/MoneySheet'
 import { QuickAddSheet } from './features/QuickAddSheet'
 import { History } from './screens/History'
+import { Login } from './screens/Login'
 import { Me } from './screens/Me'
 import { Today } from './screens/Today'
-import { navigate, useKeyboardInset, usePath } from './ui/hooks'
+import { navigate, useKeyboardInset, usePath, useSession } from './ui/hooks'
 import { openSheet, useSheet } from './ui/sheets'
 import { Toaster } from './ui/toast'
 
@@ -22,13 +24,24 @@ const TABS = [
 ] as const
 
 export default function App() {
-  const path = usePath()
-  const sheet = useSheet()
+  const session = useSession()
   useKeyboardInset()
 
+  if (session === undefined) return null
+  if (session === null) return <Login />
+  return <Shell userId={session.user.id} />
+}
+
+function Shell({ userId }: { userId: string }) {
+  const path = usePath()
+  const sheet = useSheet()
+
   useEffect(() => {
-    void ensureDefaults()
-  }, [])
+    // Pull first (a second device adopts synced categories), then fill defaults.
+    // Offline, the pull fails fast and defaults are created locally.
+    void syncNow().finally(() => void ensureDefaults())
+    return startAutoSync()
+  }, [userId])
 
   const screen = path === '/history' ? <History /> : path === '/me' ? <Me /> : <Today />
 

@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Category, Entry, Item, Settings, Target } from '../core/types'
 
-export type SyncTable = 'entries' | 'items' | 'categories' | 'targets'
+export type SyncTable = 'profiles' | 'entries' | 'items' | 'categories' | 'targets'
 
 /** A pending upload. Rows are upserted whole by id, so replaying is safe. */
 export interface OutboxOp {
