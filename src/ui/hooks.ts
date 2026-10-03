@@ -80,6 +80,7 @@ export function useKeyboardInset() {
     const update = () => {
       const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
       document.documentElement.style.setProperty('--kb', `${inset}px`)
+      document.documentElement.style.setProperty('--vvh', `${vv.height}px`)
     }
     update()
     vv.addEventListener('resize', update)

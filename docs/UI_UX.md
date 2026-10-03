@@ -11,8 +11,11 @@ and keep their parent tab highlighted.
 Answers "how is today going?" with one number + one comparison per domain — **everything above the fold, no
 scrolling to see the numbers** (user preference). One-line header, then a 2-column grid of compact tiles: Calories
 (bar vs target, left, protein), Money (spent today, bar vs budget, left · per day), Sleep (vs 30-day avg), Weight
-(Δ over ~7 days), Activity, Workout (in progress → resume; planned today → start; else this week). Then ≤3
+(Δ over ~7 days), Activity, Workout (in progress → resume; else this week / planned today). Then ≤3
 priorities, the check-in row (evening prompt if missing), and today's entries in dense rows.
+**Tapping a tile opens information, never a form** (user: "I'll tap + if I want to log"): Calories → /nutrition,
+Money → /money dashboard (month vs budget, left/day, income/net, today vs avg, vs last month, daily chart,
+categories, biggest spends, transactions), Sleep/Weight/Activity → their history screens, Workout → /training.
 
 ## Quick Add
 - Opens instantly. A 4-column grid of icon actions (Food, Expense, Workout, Sleep, Weight, Activity, Check-in,

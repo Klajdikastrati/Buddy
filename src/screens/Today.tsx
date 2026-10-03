@@ -12,7 +12,6 @@ import type { DayCheckin, Entry, ID, LocalDate, Target, WorkoutTemplate } from '
 import { db } from '../data/db'
 import { Bar } from '../ui/Bar'
 import { DOMAIN, type DomainKey } from '../ui/domains'
-import { openEntry } from '../ui/entryActions'
 import { EntryRow } from '../ui/EntryRow'
 import { navigate, useSettings, useToday } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
@@ -62,7 +61,7 @@ export function Today() {
       <div className="tiles">
         <CaloriesTile entries={entries} today={today} targets={targets} />
         <MoneyTile entries={entries} today={today} targets={targets} firstDay={firstDay} currency={settings.currency} />
-        <BodyTiles entries={entries} weights={weights} today={today} targets={targets} todays={todays} />
+        <BodyTiles entries={entries} weights={weights} today={today} targets={targets} />
         <WorkoutTile entries={entries} today={today} targets={targets} templates={templates} active={activeWorkout} />
       </div>
 
@@ -208,7 +207,7 @@ function MoneyTile({
       value={formatMoney(s.spentToday, cur)}
       bar={s.budget != null ? { value: s.spentMonth, max: s.budget, label: 'Monthly budget used' } : undefined}
       note={note}
-      onClick={() => openSheet({ kind: 'money', prefill: { kind: 'expense' } })}
+      onClick={() => navigate('/money')}
     />
   )
 }
@@ -220,16 +219,13 @@ function BodyTiles({
   weights,
   today,
   targets,
-  todays,
 }: {
   entries: Entry[]
   weights: Entry[]
   today: LocalDate
   targets: Target[]
-  todays: Entry[]
 }) {
   const sleep = sleepSummary(entries, today)
-  const lastNight = todays.find((e) => e.sleep)
   let sleepNote = 'Not logged'
   if (sleep.today != null) {
     const diff = sleep.average == null ? null : sleep.today - sleep.average
@@ -282,15 +278,15 @@ function BodyTiles({
         domain="sleep"
         value={sleep.today != null ? formatDuration(sleep.today) : '—'}
         note={sleepNote}
-        onClick={() => (lastNight ? openEntry(lastNight) : openSheet({ kind: 'sleep' }))}
+        onClick={() => navigate('/sleep')}
       />
       <Tile
         domain="weight"
         value={weight ? `${formatNumber(weight.latest.value)} kg` : '—'}
         note={weightNote}
-        onClick={() => openSheet({ kind: 'weight' })}
+        onClick={() => navigate('/weight')}
       />
-      <Tile domain="activity" value={actValue} note={actNote} onClick={() => openSheet({ kind: 'activity' })} />
+      <Tile domain="activity" value={actValue} note={actNote} onClick={() => navigate('/activity')} />
     </>
   )
 }
@@ -322,8 +318,8 @@ function WorkoutTile({
       <Tile
         domain="workout"
         value={planned[0].name}
-        note={`Planned today · tap to start${planned.length > 1 ? ` · +${planned.length - 1}` : ''}`}
-        onClick={() => openSheet({ kind: 'workout-start' })}
+        note={`Planned today${planned.length > 1 ? ` · +${planned.length - 1}` : ''}`}
+        onClick={() => navigate('/training')}
       />
     )
   }

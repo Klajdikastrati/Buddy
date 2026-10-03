@@ -38,7 +38,11 @@ export function Sheet({ open, onClose, title, children, footer }: Props) {
       d.classList.remove('leaving')
       if (!d.open) {
         d.showModal()
-        d.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+        // showModal focuses the first control; move focus without scrolling anything
+        // (the panel is still off-screen, mid-slide).
+        const target = d.querySelector<HTMLElement>('[data-autofocus]') ?? panel.current
+        target?.focus({ preventScroll: true })
+        d.scrollTop = 0
       }
       return
     }
@@ -86,7 +90,7 @@ export function Sheet({ open, onClose, title, children, footer }: Props) {
       }}
     >
       {(visible || mounted) && (
-        <div ref={panel} className="sheet-panel">
+        <div ref={panel} className="sheet-panel" tabIndex={-1}>
           <header
             className="sheet-head"
             onPointerDown={(e) => {

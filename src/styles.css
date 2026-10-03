@@ -1042,7 +1042,10 @@ select.input-inline {
   border: 0;
   background: transparent;
   color: inherit;
-  overflow: hidden;
+  /* clip, not hidden: a hidden box can still be scrolled programmatically, and iOS
+     Safari scrolls it to show the first focused control while the panel is still
+     sliding up — the panel overshoots, then snaps back. */
+  overflow: clip;
 }
 
 .sheet::backdrop {
@@ -1073,7 +1076,8 @@ select.input-inline {
   bottom: var(--kb);
   max-width: 560px;
   margin: 0 auto;
-  max-height: calc(100% - var(--kb) - var(--safe-t) - 20px);
+  /* Fit the *visible* area (the keyboard may also pan the viewport on iOS). */
+  max-height: calc(var(--vvh, 100%) - var(--safe-t) - 12px);
   display: flex;
   flex-direction: column;
   background: var(--sheet);
@@ -2480,4 +2484,99 @@ section > .label-row {
 
 .ph-row {
   height: 44px;
+}
+
+.sheet-panel:focus {
+  outline: none;
+}
+
+/* ---- Dashboards (Money, Sleep, Weight, Activity) ---- */
+
+.dense-screen {
+  gap: 14px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1), var(--highlight);
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.day-chart svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+  touch-action: pan-y;
+}
+
+.chart-readout {
+  font-size: 13px;
+  min-height: 20px;
+}
+
+.chart-readout-value {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--fg);
+}
+
+.chart-avg {
+  stroke: var(--fg-3);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.8;
+}
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--fg-3);
+}
+
+.chart-empty {
+  font-size: 14px;
+  padding: 18px 0;
+}
+
+.money-split {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cat-list {
+  padding: 4px 0;
+}
+
+.cat-row {
+  padding: 9px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cat-row + .cat-row {
+  box-shadow: inset 0 0.5px 0 var(--line);
+}
+
+.cat-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 550;
+}
+
+.cat-row .bar {
+  height: 5px;
 }

@@ -29,6 +29,8 @@ import { MeFoods } from './screens/MeFoods'
 import { MeTargets } from './screens/MeTargets'
 import { MeTrackers } from './screens/MeTrackers'
 import { MeTraining } from './screens/MeTraining'
+import { BodyDetail } from './screens/BodyDetail'
+import { Money } from './screens/Money'
 import { Nutrition } from './screens/Nutrition'
 import { Plan } from './screens/Plan'
 import { Training } from './screens/Training'
@@ -81,6 +83,10 @@ const page = (Screen: () => React.ReactNode, full = false) => () => (
 /** Screens pushed above the tabs. */
 const STACK: Record<string, StackRoute> = {
   '/nutrition': { render: page(Nutrition), parent: '/' },
+  '/money': { render: page(Money), parent: '/' },
+  '/sleep': { render: page(() => <BodyDetail kind="sleep" />), parent: '/' },
+  '/weight': { render: page(() => <BodyDetail kind="weight" />), parent: '/' },
+  '/activity': { render: page(() => <BodyDetail kind="activity" />), parent: '/' },
   '/training': { render: page(Training), parent: '/' },
   '/me/targets': { render: page(MeTargets), parent: '/me' },
   '/me/foods': { render: page(MeFoods), parent: '/me' },

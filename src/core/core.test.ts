@@ -102,3 +102,45 @@ describe('recents', () => {
     expect(searchItems(items, 're', now).map((i) => i.name)).toEqual(['Red Bull', 'Bread'])
   })
 })
+
+describe('month money', () => {
+  const m = (localDate: string, amount: number, title = 'x', categoryId: string | null = null, direction: 'out' | 'in' = 'out'): Entry => ({
+    id: `${localDate}-${title}-${amount}`,
+    kind: direction === 'out' ? 'expense' : 'income',
+    occurredAt: `${localDate}T12:00:00Z`,
+    localDate,
+    itemId: null,
+    title,
+    note: null,
+    money: { direction, amount, currency: 'ALL', categoryId },
+    createdAt: '',
+    updatedAt: '',
+    deletedAt: null,
+  })
+  it('totals the month, splits by day/category/title, and compares month-to-date', async () => {
+    const { monthMoney } = await import('./money')
+    const entries = [
+      m('2026-09-01', 1000, 'Lunch', 'food'),
+      m('2026-09-02', 400, 'Taxi', 'transport'),
+      m('2026-09-20', 5000, 'Shoes', 'shopping'),
+      m('2026-10-01', 900, 'Lunch', 'food'),
+      m('2026-10-02', 600, 'lunch', 'food'),
+      m('2026-10-03', 300, 'Taxi', 'transport'),
+      m('2026-10-02', 80000, 'Salary', null, 'in'),
+    ]
+    const r = monthMoney(entries, '2026-10-03', '2026-10-03', '2026-09-01')
+    expect(r).toMatchObject({ month: '2026-10-01', spent: 1800, income: 80000, previousToDate: 1400, perDay: 600 })
+    expect(r.byDay).toEqual([
+      { date: '2026-10-01', spent: 900 },
+      { date: '2026-10-02', spent: 600 },
+      { date: '2026-10-03', spent: 300 },
+    ])
+    expect(r.byCategory.map((c) => [c.categoryId, c.spent])).toEqual([
+      ['food', 1500],
+      ['transport', 300],
+    ])
+    expect(r.top[0]).toEqual({ title: 'Lunch', spent: 1500, count: 2 })
+    expect(r.transactions).toHaveLength(4)
+    expect(monthMoney(entries, '2026-10-03', '2026-10-03', '2026-10-01').previousToDate).toBeNull()
+  })
+})
