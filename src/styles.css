@@ -1047,6 +1047,23 @@ select.input-inline {
 
 .sheet::backdrop {
   background: rgb(0 0 0 / 0.45);
+  animation: fade-in 300ms ease;
+}
+
+.sheet.leaving::backdrop {
+  animation: fade-out 240ms ease forwards;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
 }
 
 .sheet-panel {
@@ -1062,7 +1079,15 @@ select.input-inline {
   background: var(--sheet);
   border-radius: var(--r-xl) var(--r-xl) 0 0;
   box-shadow: var(--shadow-2), var(--highlight);
-  animation: sheet-in 200ms var(--ease);
+  animation: sheet-up 380ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+
+/* iOS sheet curve: slides the whole height, settles softly. */
+@keyframes sheet-up {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
 }
 
 .sheet-panel::before {
@@ -1091,6 +1116,7 @@ select.input-inline {
   align-items: center;
   padding: 18px 14px 4px 20px;
   min-height: 56px;
+  touch-action: none; /* drag down to dismiss */
 }
 
 .sheet-head h2 {
@@ -2350,4 +2376,108 @@ section > .label-row {
 .screen.today > .setting,
 .screen.today > .prompt {
   min-height: 50px;
+}
+
+/* ---- Navigation motion: tab pager + pushed screens ---- */
+
+:root {
+  --nav-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+.pager {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: pan-y;
+  transition: transform 340ms var(--nav-ease);
+}
+
+/* A pushed screen is on top: the tabs shift back and dim (iOS/Instagram depth). */
+.pager.covered {
+  transform: translate3d(-25%, 0, 0);
+}
+
+.pager-track {
+  display: flex;
+  height: 100%;
+  width: calc(var(--pages) * 100%);
+  will-change: transform;
+}
+
+.page {
+  flex: none;
+  width: calc(100% / var(--pages));
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+.pager-dim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 340ms var(--nav-ease);
+}
+
+.pager.covered .pager-dim {
+  opacity: 1;
+}
+
+.stack-page {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background: var(--bg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  box-shadow: -12px 0 32px rgb(0 0 0 / 0.14);
+  will-change: transform;
+}
+
+.stack-page.modal {
+  z-index: 15;
+  box-shadow: 0 -12px 32px rgb(0 0 0 / 0.14);
+}
+
+.tab svg {
+  transition: transform 160ms var(--ease);
+}
+
+.tab:active svg {
+  transform: scale(0.86);
+}
+
+/* Placeholder rows while a just-started workout's data lands (a few frames). */
+.wk-placeholder {
+  gap: 10px;
+  padding: 14px;
+}
+
+.ph {
+  display: block;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.ph-title {
+  width: 55%;
+  height: 20px;
+}
+
+.ph-row {
+  height: 44px;
 }

@@ -14,7 +14,8 @@ src/screens/   tabs (Today, History, Plan, Me), domain screens (/nutrition, /tra
 | Piece | Choice | Why |
 |---|---|---|
 | App | Vite + React 19 + TS (strict), static SPA | No server in the interaction path; SSR buys nothing for a single-user, auth-only app |
-| Local data | Dexie (IndexedDB) + `useLiveQuery` | UI reads/writes locally → instant. Replaces state manager + cache + offline libs |
+| Local data | Dexie (IndexedDB) + `ui/live.ts` `useLiveQuery` | UI reads/writes locally → instant. Replaces state manager + cache + offline libs. The hook is gated per page (`PageGate`): off-screen tabs keep their last data and stop re-rendering on writes, so a save only re-renders what's visible |
+| Navigation | `ui/Pager.tsx` (tabs, swipe) + `ui/Stack.tsx` (pushed screens) | All tab screens stay mounted (memoised) → instant switches, kept scroll; hand-rolled pointer gestures, no gesture lib |
 | Cloud | Supabase (Postgres, Auth, RLS), region eu-central-1 | Source of truth + sync; RLS is the security boundary |
 | Offline shell | vite-plugin-pwa (Workbox `generateSW`) | App opens from disk, works offline |
 | Tests | Vitest — pure `core/` logic only | |

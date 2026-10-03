@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useState } from 'react'
 import { sleepMinutes } from '../core/body'
 import { addDays, formatDuration } from '../core/dates'

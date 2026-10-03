@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { formatWeekdays, weekdayOf } from '../core/dates'
 import type { ID, WorkoutTemplate } from '../core/types'
 import { db } from '../data/db'
@@ -6,6 +6,7 @@ import { startWorkout } from '../data/repo-training'
 import { DOMAIN } from '../ui/domains'
 import { navigate, useSettings, useToday } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
+import { setPendingWorkout } from '../ui/pending'
 import { closeSheet, openSheet } from '../ui/sheets'
 import { Sheet } from '../ui/Sheet'
 
@@ -21,10 +22,12 @@ export function WorkoutStartSheet() {
   const wd = weekdayOf(today)
   const sorted = [...templates].sort((a, b) => Number(b.weekdays.includes(wd)) - Number(a.weekdays.includes(wd)) || a.name.localeCompare(b.name))
 
+  /** Navigate first so Workout Mode slides up on the tap; the write lands while it moves. */
   async function start(t: WorkoutTemplate | null) {
-    await startWorkout(t)
+    setPendingWorkout({ title: t?.name ?? 'Workout', exercises: t?.exercises.length ?? 0 })
     closeSheet()
     navigate('/workout')
+    await startWorkout(t)
   }
 
   return (

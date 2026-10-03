@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useState } from 'react'
 import { parseDecimal, slugKey } from '../core/numbers'
 import type { CustomFacet, Entry, ID, TrackerDef, TrackerField, TrackerFieldType } from '../core/types'

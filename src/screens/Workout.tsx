@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useEffect, useRef, useState } from 'react'
 import { formatShortDate } from '../core/dates'
 import { formatNumber, parseDecimal } from '../core/numbers'
@@ -20,6 +20,7 @@ import { useWorkoutData, WorkoutSummaryView } from '../features/WorkoutSummary'
 import { DOMAIN } from '../ui/domains'
 import { navigate } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
+import { pendingWorkout, setPendingWorkout } from '../ui/pending'
 import { openSheet } from '../ui/sheets'
 import { Sheet } from '../ui/Sheet'
 import { toast } from '../ui/toast'
@@ -29,9 +30,14 @@ let justFinished: ID | null = null
 
 /** Workout Mode: full screen, no tab bar. The active workout id lives in `meta.activeWorkout`, so a reload resumes it. */
 export function Workout() {
-  const activeId = useLiveQuery(async () => ((await db.meta.get('activeWorkout'))?.value as ID | undefined) ?? null, [])
+  const session = useLiveQuery(loadSession, [])
   const [summaryId, setSummaryId] = useState<ID | null>(justFinished)
-  if (activeId === undefined) return null
+  const starting = pendingWorkout()
+  // Just tapped Start: draw the frame now, rows fill in when the write lands.
+  if (!session && starting && !summaryId) return <StartingWorkout title={starting.title} exercises={starting.exercises} />
+  if (session === undefined) return null
+  if (session) setPendingWorkout(null)
+  const activeId = session?.entry.id ?? null
   if (summaryId && !activeId) {
     return (
       <Finished
@@ -43,16 +49,40 @@ export function Workout() {
       />
     )
   }
-  if (!activeId) return <NoWorkout />
+  if (!session) return <NoWorkout />
   return (
     <ActiveWorkout
-      entryId={activeId}
+      session={session}
       onFinish={async (id) => {
         justFinished = id
         setSummaryId(id)
         await finishWorkout(id)
       }}
     />
+  )
+}
+
+function StartingWorkout({ title, exercises }: { title: string; exercises: number }) {
+  return (
+    <div className="workout" aria-busy="true">
+      <header className="wk-head">
+        <div className="grow">
+          <h1 className="wk-title">{title}</h1>
+          <p className="wk-meta num">0:00 · starting…</p>
+        </div>
+        <button type="button" className="btn btn-primary btn-small" disabled>
+          Finish
+        </button>
+      </header>
+      {Array.from({ length: Math.max(1, exercises) }, (_, i) => (
+        <section key={i} className="wk-ex wk-placeholder" aria-hidden="true">
+          <span className="ph ph-title" />
+          <span className="ph ph-row" />
+          <span className="ph ph-row" />
+          <span className="ph ph-row" />
+        </section>
+      ))}
+    </div>
   )
 }
 
@@ -94,27 +124,37 @@ interface Group {
   sets: WorkoutSet[]
 }
 
-function ActiveWorkout({ entryId, onFinish }: { entryId: ID; onFinish: (id: ID) => Promise<void> }) {
-  const entry = useLiveQuery(() => db.entries.get(entryId), [entryId])
-  const sets = useLiveQuery(
-    () => db.sets.where('entryId').equals(entryId).filter((s) => !s.deletedAt).toArray(),
-    [entryId],
-  )
-  const exercises = useLiveQuery(() => db.exercises.toArray(), [])
-  const templateId = entry?.workout?.templateId ?? null
-  const template = useLiveQuery(async () => (templateId ? ((await db.templates.get(templateId)) ?? null) : null), [templateId])
-  const ids = [...new Set((sets ?? []).map((s) => s.exerciseId))].sort().join(',')
-  const history = useLiveQuery(async () => {
-    const list = ids ? ids.split(',') : []
-    const [workouts, hsets] = await Promise.all([
-      db.entries.where('kind').equals('workout').toArray(),
-      list.length ? db.sets.where('exerciseId').anyOf(list).toArray() : Promise.resolve([] as WorkoutSet[]),
-    ])
-    return { workouts, sets: hsets }
-  }, [ids])
-  const [picking, setPicking] = useState(false)
+interface Session {
+  entry: Entry
+  sets: WorkoutSet[]
+  exercises: Exercise[]
+  template: WorkoutTemplate | null
+  history: { workouts: Entry[]; sets: WorkoutSet[] }
+}
 
-  if (!entry?.workout || !sets || !exercises || template === undefined || !history) return null
+/**
+ * Everything Workout Mode shows, in one live query — separate chained queries
+ * made the screen fill in ~0.3 s after it slid up.
+ */
+async function loadSession(): Promise<Session | null> {
+  const id = (await db.meta.get('activeWorkout'))?.value as ID | undefined
+  const entry = id ? await db.entries.get(id) : undefined
+  if (!entry?.workout || entry.deletedAt) return null
+  const sets = (await db.sets.where('entryId').equals(entry.id).toArray()).filter((s) => !s.deletedAt)
+  const ids = [...new Set(sets.map((s) => s.exerciseId))]
+  const [exercises, template, workouts, historySets] = await Promise.all([
+    db.exercises.toArray(),
+    entry.workout.templateId ? db.templates.get(entry.workout.templateId) : Promise.resolve(undefined),
+    db.entries.where('kind').equals('workout').toArray(),
+    ids.length ? db.sets.where('exerciseId').anyOf(ids).toArray() : Promise.resolve([] as WorkoutSet[]),
+  ])
+  return { entry, sets, exercises, template: template ?? null, history: { workouts, sets: historySets } }
+}
+
+function ActiveWorkout({ session, onFinish }: { session: Session; onFinish: (id: ID) => Promise<void> }) {
+  const { entry, sets, exercises, template, history } = session
+  const entryId = entry.id
+  const [picking, setPicking] = useState(false)
   const exerciseById = new Map(exercises.map((e) => [e.id, e]))
 
   const groups: Group[] = []
@@ -148,7 +188,7 @@ function ActiveWorkout({ entryId, onFinish }: { entryId: ID; onFinish: (id: ID) 
         <div className="grow">
           <h1 className="wk-title">{entry.title}</h1>
           <p className="wk-meta num">
-            <Elapsed since={entry.workout.startedAt} /> · {done} of {sets.length} sets
+            <Elapsed since={entry.workout!.startedAt} /> · {done} of {sets.length} sets
           </p>
         </div>
         <button type="button" className="btn btn-primary btn-small" onClick={() => void finish()}>

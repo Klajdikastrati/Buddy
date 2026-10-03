@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useState } from 'react'
 import { formatShortDate } from '../core/dates'
 import { formatNumber, parseDecimal } from '../core/numbers'

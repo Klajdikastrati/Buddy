@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useState } from 'react'
 import { normalizeName } from '../core/recents'
 import type { Exercise, ID } from '../core/types'

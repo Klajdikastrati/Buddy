@@ -1,5 +1,5 @@
-import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect } from 'react'
+import { useLiveQuery } from './ui/live'
+import { memo, useEffect, useLayoutEffect, useState } from 'react'
 import type { ID } from './core/types'
 import { db } from './data/db'
 import { ensureDefaults } from './data/repo'
@@ -36,7 +36,9 @@ import { Workout } from './screens/Workout'
 import { Today } from './screens/Today'
 import { navigate, useKeyboardInset, usePath, useSession } from './ui/hooks'
 import { Icon, type IconName } from './ui/icons'
+import { Pager, scrollPageTop } from './ui/Pager'
 import { openSheet, useSheet } from './ui/sheets'
+import { StackLayer, type StackRoute } from './ui/Stack'
 import { Toaster } from './ui/toast'
 
 interface Tab {
@@ -55,20 +57,45 @@ const RIGHT: Tab[] = [
   { path: '/me', label: 'Me', icon: 'me' },
 ]
 
-const ROUTES: Record<string, () => React.ReactNode> = {
-  '/': Today,
-  '/history': History,
-  '/me': Me,
-  '/plan': Plan,
-  '/me/targets': MeTargets,
-  '/me/foods': MeFoods,
-  '/nutrition': Nutrition,
-  '/training': Training,
-  '/me/training': MeTraining,
-  '/me/trackers': MeTrackers,
-  '/me/analyst': MeAnalyst,
-  '/workout': Workout,
+/** The tab pages, in tab-bar order (the + sits between History and Plan). */
+const TABS: Tab[] = [...LEFT, ...RIGHT]
+const TAB_SCREENS = [Today, History, Plan, Me]
+
+/** Memoised: navigating must not re-render the four mounted tab screens (they read their own data). */
+const TabPage = memo(function TabPage({ index }: { index: number }) {
+  const Screen = TAB_SCREENS[index]
+  return (
+    <main className="main">
+      <Screen />
+    </main>
+  )
+})
+const TAB_PAGES = TAB_SCREENS.map((_, i) => <TabPage key={i} index={i} />)
+
+const page = (Screen: () => React.ReactNode, full = false) => () => (
+  <main className={full ? 'main main-full' : 'main'}>
+    <Screen />
+  </main>
+)
+
+/** Screens pushed above the tabs. */
+const STACK: Record<string, StackRoute> = {
+  '/nutrition': { render: page(Nutrition), parent: '/' },
+  '/training': { render: page(Training), parent: '/' },
+  '/me/targets': { render: page(MeTargets), parent: '/me' },
+  '/me/foods': { render: page(MeFoods), parent: '/me' },
+  '/me/training': { render: page(MeTraining), parent: '/me' },
+  '/me/trackers': { render: page(MeTrackers), parent: '/me' },
+  '/me/analyst': { render: page(MeAnalyst), parent: '/me' },
+  '/workout': { render: page(Workout, true), parent: null, modal: true },
 }
+
+const tabIndexOf = (path: string) => {
+  const i = TABS.findIndex((t) => t.path === path)
+  return i >= 0 ? i : null
+}
+/** The tab a pushed screen belongs to when the app opens straight onto it. */
+const homeTabOf = (path: string) => (path.startsWith('/me') ? 3 : 0)
 
 export default function App() {
   const session = useSession()
@@ -93,48 +120,57 @@ function Shell({ userId }: { userId: string }) {
     return startAutoSync()
   }, [userId])
 
-  const Screen = ROUTES[path] ?? Today
-  // A sub-screen keeps its parent tab highlighted.
-  const section = '/' + (path.split('/')[1] ?? '')
-  // Workout Mode takes the whole screen.
-  const fullscreen = path === '/workout'
+  // The pager stays on the tab you came from while a screen is pushed on top.
+  const [tabIndex, setTabIndex] = useState(() => tabIndexOf(path) ?? homeTabOf(path))
+  useLayoutEffect(() => {
+    const i = tabIndexOf(path)
+    if (i != null) setTabIndex(i)
+  }, [path])
+  const pushed = !!STACK[path]
 
-  const tab = (t: Tab) => (
-    <a
-      key={t.path}
-      href={t.path}
-      className="tab"
-      aria-current={section === t.path ? 'page' : undefined}
-      onClick={(e) => {
-        e.preventDefault()
-        navigate(t.path)
-      }}
-    >
-      <Icon name={t.icon} size={24} strokeWidth={section === t.path ? 2.1 : 1.8} />
-      <span>{t.label}</span>
-    </a>
-  )
+  const tab = (t: Tab) => {
+    const i = TABS.indexOf(t)
+    const current = i === tabIndex
+    return (
+      <a
+        key={t.path}
+        href={t.path}
+        className="tab"
+        aria-current={current ? 'page' : undefined}
+        onClick={(e) => {
+          e.preventDefault()
+          // Tapping the tab you're on scrolls it to the top (or closes a pushed screen).
+          if (current && !pushed) scrollPageTop(i)
+          else navigate(t.path)
+        }}
+      >
+        <Icon name={t.icon} size={24} strokeWidth={current ? 2.1 : 1.8} />
+        <span>{t.label}</span>
+      </a>
+    )
+  }
 
   return (
-    <>
-      <main className={fullscreen ? 'main main-full' : 'main'}>
-        <Screen />
-      </main>
+    <div className="shell">
+      <Pager
+        index={tabIndex}
+        covered={pushed}
+        onSwipe={(i) => navigate(TABS[i].path)}
+        pages={TAB_PAGES}
+      />
 
-      {!fullscreen && (
-        <>
-          <ResumeBar />
-          <nav className="tabbar" aria-label="Main">
-            <div className="tab-group">{LEFT.map(tab)}</div>
-            <button type="button" className="tab tab-add" aria-label="Quick add" onClick={() => openSheet({ kind: 'quick-add' })}>
-              <span className="add-disc">
-                <Icon name="plus" size={24} strokeWidth={2.4} />
-              </span>
-            </button>
-            <div className="tab-group">{RIGHT.map(tab)}</div>
-          </nav>
-        </>
-      )}
+      {path !== '/workout' && <ResumeBar />}
+      <nav className="tabbar" aria-label="Main">
+        <div className="tab-group">{LEFT.map(tab)}</div>
+        <button type="button" className="tab tab-add" aria-label="Quick add" onClick={() => openSheet({ kind: 'quick-add' })}>
+          <span className="add-disc">
+            <Icon name="plus" size={24} strokeWidth={2.4} />
+          </span>
+        </button>
+        <div className="tab-group">{RIGHT.map(tab)}</div>
+      </nav>
+
+      <StackLayer path={path} routes={STACK} onBack={navigate} />
 
       {sheet.kind === 'quick-add' && <QuickAddSheet />}
       {sheet.kind === 'money' && <MoneySheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} prefill={sheet.prefill} />}
@@ -154,7 +190,7 @@ function Shell({ userId }: { userId: string }) {
       {sheet.kind === 'tracker-log' && <TrackerLogSheet key={sheet.entry?.id ?? sheet.trackerId} trackerId={sheet.trackerId} entry={sheet.entry} />}
       {sheet.kind === 'analyst-export' && <ExportSheet />}
       <Toaster />
-    </>
+    </div>
   )
 }
 

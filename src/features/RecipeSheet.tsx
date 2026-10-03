@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useMemo, useState } from 'react'
 import { recipeGrams, recipePer100, scaleNutrients, searchFoods, unitOf } from '../core/nutrition'
 import { formatNumber, parseDecimal } from '../core/numbers'

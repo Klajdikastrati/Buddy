@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useRef, useState } from 'react'
 import { weightSummary } from '../core/body'
 import { formatShortDate } from '../core/dates'

@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useState } from 'react'
 import { formatMoney } from '../core/money'
 import { formatTarget, targetOn, TARGET_DEFS } from '../core/targets'

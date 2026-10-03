@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useState } from 'react'
 import { ACTIVITY_LABEL } from '../core/body'
 import { parseDecimal } from '../core/numbers'

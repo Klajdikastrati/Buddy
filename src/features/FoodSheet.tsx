@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { formatMoney, parseAmount } from '../core/money'
 import { per100FromSnapshot, scaleNutrients, searchFoods, unitOf, type FoodDraft } from '../core/nutrition'

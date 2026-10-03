@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useMemo } from 'react'
 import { ACTIVITY_LABEL, activityOn, sleepSummary, weightSummary } from '../core/body'
 import { addDays, formatDuration, formatShortDate, hourIn, monthStart, weekdayOf, weekStart } from '../core/dates'

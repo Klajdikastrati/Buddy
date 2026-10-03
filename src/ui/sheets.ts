@@ -26,21 +26,45 @@ export type SheetState =
   | { kind: 'analyst-export' }
 
 let state: SheetState = { kind: 'none' }
+/** The open sheet is animating out; it unmounts when `finishClose` runs. */
+let closing = false
+let fallback: ReturnType<typeof setTimeout> | undefined
 const listeners = new Set<() => void>()
-
-export function openSheet(next: SheetState) {
-  state = next
-  listeners.forEach((fn) => fn())
+const emit = () => listeners.forEach((fn) => fn())
+const subscribe = (fn: () => void) => {
+  listeners.add(fn)
+  return () => {
+    listeners.delete(fn)
+  }
 }
 
-export const closeSheet = () => openSheet({ kind: 'none' })
+export function openSheet(next: SheetState) {
+  clearTimeout(fallback)
+  closing = false
+  state = next
+  emit()
+}
+
+/** Slide the open sheet away (the Sheet calls `finishClose` when its exit animation ends). */
+export function closeSheet() {
+  if (state.kind === 'none' || closing) return
+  closing = true
+  emit()
+  fallback = setTimeout(finishClose, 450)
+}
+
+export function finishClose() {
+  clearTimeout(fallback)
+  if (!closing) return
+  closing = false
+  state = { kind: 'none' }
+  emit()
+}
 
 export function useSheet(): SheetState {
-  return useSyncExternalStore(
-    (fn) => {
-      listeners.add(fn)
-      return () => listeners.delete(fn)
-    },
-    () => state,
-  )
+  return useSyncExternalStore(subscribe, () => state)
+}
+
+export function useSheetClosing(): boolean {
+  return useSyncExternalStore(subscribe, () => closing)
 }

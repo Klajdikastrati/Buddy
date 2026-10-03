@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { formatDuration, formatShortDate, formatTime } from '../core/dates'
 import { formatKg as kg, formatNumber } from '../core/numbers'
 import { countsAsWork, summarizeWorkout } from '../core/training'

@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useMemo, useState } from 'react'
 import { formatDuration, formatShortDate, weekStart } from '../core/dates'
 import { formatKg } from '../core/numbers'

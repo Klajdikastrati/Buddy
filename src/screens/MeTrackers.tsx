@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { db } from '../data/db'
 import { archiveTracker } from '../data/repo-trackers'
 import { DOMAIN } from '../ui/domains'

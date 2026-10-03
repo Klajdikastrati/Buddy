@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from './live'
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { localDateOf } from '../core/dates'
 import type { Settings } from '../core/types'
@@ -63,7 +63,6 @@ export function navigate(path: string) {
   if (path === location.pathname) return
   history.pushState(null, '', path)
   listeners.forEach((fn) => fn())
-  window.scrollTo(0, 0)
 }
 
 export function usePath(): string {

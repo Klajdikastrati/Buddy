@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useRef, useState } from 'react'
 import { validateAnalysis, type Analysis } from '../core/analyst'
 import { formatShortDate } from '../core/dates'

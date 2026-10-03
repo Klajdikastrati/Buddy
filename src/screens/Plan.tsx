@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '../ui/live'
 import { useState } from 'react'
 import { formatDayLabel, formatLongDate, formatShortDate } from '../core/dates'
 import { planFor } from '../core/plan'
