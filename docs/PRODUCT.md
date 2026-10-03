@@ -27,3 +27,4 @@ Success metric: still opened daily six months from now.
   manual steps/sleep entry becomes a real pain after ~2 months of use.
 - 2026-10-03 — Money ships first (with the foundation) so Buddy is used from week 1.
 - 2026-10-03 — Plan tab hidden until Phase 5 — no empty tabs.
+- 2026-10-03 — Visual direction raised to "premium calm" (user: too basic). The + stays centred in the tab bar.

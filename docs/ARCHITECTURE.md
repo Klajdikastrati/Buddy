@@ -20,6 +20,8 @@ src/screens/   Today, History, Me
 | Router | ~20-line pathname router in `ui/hooks.ts` | Three screens don't need a library |
 
 No UI kit, no icon lib, no chart lib, no state lib. Adding a significant dependency needs a demonstrated problem.
+Assets: Inter variable font, Latin subset (`public/fonts`, 48 KB, OFL, precached) — only used where SF Pro isn't
+available, so the app looks the same on a Windows/Android browser as on the iPhone.
 
 ## Data flow
 1. Screen reads Dexie via `useLiveQuery` (re-renders on any local change).

@@ -1,18 +1,21 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
-import { formatMoney, parseAmount } from '../core/money'
+import { formatMoney } from '../core/money'
+import { formatTarget, targetOn, TARGET_DEFS } from '../core/targets'
 import { db } from '../data/db'
-import { targetOn } from '../core/targets'
-import { addCategory, saveSettings, setTarget, updateCategory, updateItem } from '../data/repo'
+import { addCategory, saveSettings, updateCategory, updateItem } from '../data/repo'
 import { signOut, syncNow, type SyncState } from '../data/sync'
-import { useSettings, useSyncState, useToday } from '../ui/hooks'
+import { DOMAIN } from '../ui/domains'
+import { NavRow } from '../ui/fields'
+import { navigate, useSettings, useSyncState, useToday } from '../ui/hooks'
+import { IconChip } from '../ui/icons'
 import { toast } from '../ui/toast'
 
 function syncLabel(s: SyncState, pending: number): string {
   const waiting = pending ? ` · ${pending} waiting` : ''
   if (s.status === 'syncing') return 'Syncing…'
   if (s.status === 'offline') return `Offline${waiting}`
-  if (s.status === 'error') return `Couldn’t sync${waiting} · tap to retry`
+  if (s.status === 'error') return `Couldn’t sync${waiting}`
   if (!s.lastSyncedAt) return pending ? `${pending} waiting` : 'Not synced yet'
   const mins = Math.round((Date.now() - Date.parse(s.lastSyncedAt)) / 60_000)
   return `Synced ${mins < 1 ? 'just now' : `${mins} min ago`}${waiting}`
@@ -26,29 +29,20 @@ export function Me() {
   const categories = useLiveQuery(() => db.categories.orderBy('sortOrder').filter((c) => !c.deletedAt).toArray(), [])
   const items = useLiveQuery(() => db.items.filter((i) => !i.deletedAt).toArray(), [])
   const pending = useLiveQuery(() => db.outbox.count(), [])
-  const budget = targets ? targetOn(targets, 'budget_month', today) : null
-
-  const [budgetDraft, setBudgetDraft] = useState<string | null>(null)
   const [newCat, setNewCat] = useState('')
 
-  async function saveBudget() {
-    if (budgetDraft == null) return
-    const value = budgetDraft.trim() ? parseAmount(budgetDraft) : null
-    if (budgetDraft.trim() && value == null) return toast('Enter a number for the budget.')
-    await setTarget('budget_month', value, settings.currency, today)
-    setBudgetDraft(null)
-    toast(value == null ? 'Budget removed' : `Budget set to ${formatMoney(value, settings.currency)} a month`)
-  }
+  const setTargets = targets ? TARGET_DEFS.filter((d) => targetOn(targets, d.key, today) != null) : []
+  const budget = targets ? targetOn(targets, 'budget_month', today) : null
+  const targetsTrail = budget != null
+    ? `${formatTarget('budget_month', budget, settings.currency)}${setTargets.length > 1 ? ` +${setTargets.length - 1}` : ''}`
+    : setTargets.length
+      ? `${setTargets.length} set`
+      : 'None set'
 
   async function exportBackup() {
-    const data = {
-      exportedAt: new Date().toISOString(),
-      settings,
-      entries: await db.entries.toArray(),
-      items: await db.items.toArray(),
-      categories: await db.categories.toArray(),
-      targets: await db.targets.toArray(),
-    }
+    const tables = ['entries', 'items', 'categories', 'targets', 'foods', 'exercises', 'templates', 'sets', 'checkins', 'plan', 'trackers', 'analystRuns', 'recommendations'] as const
+    const data: Record<string, unknown> = { exportedAt: new Date().toISOString(), settings }
+    for (const t of tables) data[t] = await db.table(t).toArray()
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
     const a = Object.assign(document.createElement('a'), { href: url, download: `buddy-backup-${today}.json` })
     a.click()
@@ -63,59 +57,13 @@ export function Me() {
         <h1>Me</h1>
       </header>
 
-      <section className="group" aria-labelledby="money-set">
-        <h2 id="money-set" className="section-label">
-          Money
-        </h2>
-        <form
-          className="setting"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void saveBudget()
-          }}
-        >
-          <label htmlFor="budget">Monthly budget</label>
-          <input
-            id="budget"
-            className="input input-inline num"
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="None"
-            value={budgetDraft ?? (budget != null ? String(budget) : '')}
-            onChange={(e) => setBudgetDraft(e.target.value)}
-            onBlur={() => void saveBudget()}
-          />
-        </form>
-        <div className="setting">
-          <span>Currency</span>
-          <span className="muted">{settings.currency === 'ALL' ? 'Lek (ALL)' : settings.currency}</span>
-        </div>
-      </section>
-
-      <section className="group" aria-labelledby="day-set">
-        <h2 id="day-set" className="section-label">
-          Day
-        </h2>
-        <div className="setting">
-          <label htmlFor="rollover">New day starts at</label>
-          <select
-            id="rollover"
-            className="input input-inline"
-            value={settings.rolloverHour}
-            onChange={(e) => void saveSettings({ rolloverHour: Number(e.target.value) })}
-          >
-            {[0, 1, 2, 3, 4, 5, 6].map((h) => (
-              <option key={h} value={h}>
-                {String(h).padStart(2, '0')}:00
-              </option>
-            ))}
-          </select>
-        </div>
+      <section className="settings-group with-icons" aria-label="Setup">
+        <NavRow icon="target" tint={DOMAIN.plan.tint} label="Targets" trail={targetsTrail} onClick={() => navigate('/me/targets')} />
       </section>
 
       <section className="group" aria-labelledby="cat-set">
         <h2 id="cat-set" className="section-label">
-          Categories
+          Spending categories
         </h2>
         <ul className="list">
           {categories?.map((c) => (
@@ -157,13 +105,16 @@ export function Me() {
           Saved items
         </h2>
         {sortedItems.length === 0 && <p className="muted">Items are saved automatically when you log something.</p>}
-        <ul className="list">
+        <ul className="list with-icons">
           {sortedItems.map((i) => (
             <li key={i.id} className="list-row">
+              <span className="row-icon">
+                <IconChip name={DOMAIN[i.kind].icon} tint={DOMAIN[i.kind].tint} />
+              </span>
               <span className={`row-main static ${i.archived ? 'muted' : ''}`}>
                 <span className="row-title">{i.name}</span>
                 <span className="row-sub num">
-                  {i.money ? formatMoney(i.money.amount, i.money.currency) : ''} · used {i.useCount}×
+                  {[i.money ? formatMoney(i.money.amount, i.money.currency) : null, `used ${i.useCount}×`].filter(Boolean).join(' · ')}
                 </span>
               </span>
               <button
@@ -182,26 +133,57 @@ export function Me() {
         </ul>
       </section>
 
+      <section className="group" aria-labelledby="day-set">
+        <h2 id="day-set" className="section-label">
+          General
+        </h2>
+        <div className="settings-group">
+          <div className="setting">
+            <span>Currency</span>
+            <span className="setting-trail">{settings.currency === 'ALL' ? 'Lek (ALL)' : settings.currency}</span>
+          </div>
+          <div className="setting">
+            <label htmlFor="rollover">New day starts at</label>
+            <select
+              id="rollover"
+              className="input input-inline"
+              value={settings.rolloverHour}
+              onChange={(e) => void saveSettings({ rolloverHour: Number(e.target.value) })}
+            >
+              {[0, 1, 2, 3, 4, 5, 6].map((h) => (
+                <option key={h} value={h}>
+                  {String(h).padStart(2, '0')}:00
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </section>
+
       <section className="group" aria-labelledby="data-set">
         <h2 id="data-set" className="section-label">
           Data
         </h2>
-        <button type="button" className="setting setting-button" onClick={() => void syncNow()}>
-          <span>Cloud sync</span>
-          <span className={`muted ${sync.status === 'error' ? 'over' : ''}`}>{syncLabel(sync, pending ?? 0)}</span>
-        </button>
-        <button type="button" className="btn btn-quiet full" onClick={() => void exportBackup()}>
-          Download backup
-        </button>
-        <button
-          type="button"
-          className="btn btn-quiet full"
-          onClick={async () => {
-            if (!(await signOut())) toast('Some changes haven’t synced yet. Connect to the internet first.')
-          }}
-        >
-          Sign out
-        </button>
+        <div className="settings-group with-icons">
+          <NavRow
+            icon="cloud"
+            label="Cloud sync"
+            trail={<span className={sync.status === 'error' ? 'over' : ''}>{syncLabel(sync, pending ?? 0)}</span>}
+            onClick={() => void syncNow()}
+            chevron={false}
+          />
+          <NavRow icon="download" label="Download backup" onClick={() => void exportBackup()} chevron={false} />
+          <NavRow
+            icon="logout"
+            tint="var(--danger)"
+            label="Sign out"
+            danger
+            chevron={false}
+            onClick={async () => {
+              if (!(await signOut())) toast('Some changes haven’t synced yet. Connect to the internet first.')
+            }}
+          />
+        </div>
       </section>
     </div>
   )

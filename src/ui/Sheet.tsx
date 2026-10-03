@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { Icon } from './icons'
 
 interface Props {
   open: boolean
@@ -46,8 +47,8 @@ export function Sheet({ open, onClose, title, children, footer }: Props) {
         <div className="sheet-panel">
           <header className="sheet-head">
             <h2>{title}</h2>
-            <button type="button" className="btn-text" onClick={onClose}>
-              Close
+            <button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>
+              <Icon name="close" size={16} strokeWidth={2.4} />
             </button>
           </header>
           <div className="sheet-body">{children}</div>

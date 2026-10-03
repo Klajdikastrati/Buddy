@@ -74,3 +74,34 @@ export function formatTime(instant: string, timeZone: string, locale = 'en-GB'):
     new Date(instant),
   )
 }
+
+/** Wall-clock hour (0–23) of an instant in a time zone. */
+export function hourIn(instant: Date, timeZone: string): number {
+  return wallClock(instant, timeZone).hour
+}
+
+/** 0 = Sunday … 6 = Saturday. */
+export function weekdayOf(date: LocalDate): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay()
+}
+
+/** The Monday of the week containing `date`. */
+export function weekStart(date: LocalDate): LocalDate {
+  return addDays(date, -((weekdayOf(date) + 6) % 7))
+}
+
+/** 452 → "7h 32m"; 45 → "45m". */
+export function formatDuration(minutes: number): string {
+  const m = Math.round(Math.abs(minutes))
+  const h = Math.floor(m / 60)
+  return h ? `${h}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`
+}
+
+export const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/** "Mon 28 Sep" — for dates near today. */
+export function formatShortDate(date: LocalDate, locale = 'en-GB'): string {
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(
+    new Date(`${date}T00:00:00Z`),
+  )
+}

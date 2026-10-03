@@ -21,7 +21,10 @@ export function Login() {
   return (
     <main className="main login">
       <form className="form" onSubmit={submit}>
-        <h1 className="login-title">Buddy</h1>
+        <div>
+          <h1 className="login-title">Buddy</h1>
+          <p className="login-sub">Log once. See your days clearly.</p>
+        </div>
         <label className="field">
           <span className="field-label">Email</span>
           <input

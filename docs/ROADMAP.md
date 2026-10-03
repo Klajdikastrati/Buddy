@@ -16,10 +16,13 @@ Decided 2026-10-03 by the user: build everything now instead of phase-by-phase u
 - Generic sync: `src/core/sync-map.ts` (`SPECS` registry, entry facets ⇄ facet tables) + `src/data/sync.ts`
   (push in FK order, pull per-table cursors, `entry_money`/`entry_nutrition` rows deleted when a facet is removed).
 
+- Repo writes for every table: `repo-base.ts` (`put`/`save`/`patch`, `rememberItem`, `entryRow`) + `repo-body`,
+  `repo-food`, `repo-training`, `repo-plan`, `repo-trackers`, `repo-analyst`. `targetOn` moved to `core/targets.ts`.
+
 **Next, in order**
-1. Repo writes for the new tables (generic `put`+`queue` helper; keep `src/data/repo.ts` small — split per domain
-   e.g. `repo-body.ts`, `repo-food.ts`, `repo-training.ts`, `repo-plan.ts`, `repo-analyst.ts`).
-2. **Body & day** — Sleep sheet (bed/wake → duration, quality), Weight sheet, Activity sheet (walk/run/cycle:
+1. ~~Repo writes for the new tables~~ — done.
+2. ~~**Body & day**~~ — done (+ premium design refresh, `/me/targets`, check-in line in History). Spec: Sleep sheet
+   (bed/wake → duration, quality), Weight sheet, Activity sheet (walk/run/cycle:
    minutes, km, steps), evening Check-in sheet (mood, energy, stress, productivity, note; one row per day).
    Today blocks: Sleep (last night vs 30-day avg), Weight (latest, Δ vs ~7 days), Activity, check-in prompt
    in the evening if not done. Quick Add gets the new actions.
@@ -66,5 +69,7 @@ XP/levels/coins/store · AI inside Buddy · onboarding wizard · multi-user · n
 recurring expenses + category budgets (after real use) · water/screen-time/career domains (custom trackers cover them).
 
 ## Known issues / notes
+- 2026-10-03 — User: the look is "very basic… like a 2010 website", wants a more premium feel. Done mid-session as a
+  design-system refresh (see UI_UX.md) before building the remaining screens, so they inherit it.
 - Undo of a one-tap log leaves the item's `useCount` incremented (harmless ranking nudge).
 - Bundle ~575 KB (supabase-js); precached by the service worker. Consider code-splitting `/workout`, charts, scanner.

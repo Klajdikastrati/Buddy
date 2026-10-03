@@ -1,27 +1,41 @@
 import { useEffect } from 'react'
 import { ensureDefaults } from './data/repo'
 import { startAutoSync, syncNow } from './data/sync'
+import { ActivitySheet } from './features/ActivitySheet'
+import { CheckinSheet } from './features/CheckinSheet'
 import { MoneySheet } from './features/MoneySheet'
 import { QuickAddSheet } from './features/QuickAddSheet'
+import { SleepSheet } from './features/SleepSheet'
+import { WeightSheet } from './features/WeightSheet'
 import { History } from './screens/History'
 import { Login } from './screens/Login'
 import { Me } from './screens/Me'
+import { MeTargets } from './screens/MeTargets'
 import { Today } from './screens/Today'
 import { navigate, useKeyboardInset, usePath, useSession } from './ui/hooks'
+import { Icon, type IconName } from './ui/icons'
 import { openSheet, useSheet } from './ui/sheets'
 import { Toaster } from './ui/toast'
 
-const icon = (d: string) => (
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d={d} />
-  </svg>
-)
+interface Tab {
+  path: string
+  label: string
+  icon: IconName
+}
 
-const TABS = [
-  { path: '/', label: 'Today', icon: icon('M12 3v2m0 14v2M5 12H3m18 0h-2M6.3 6.3 4.9 4.9m14.2 14.2-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z') },
-  { path: '/history', label: 'History', icon: icon('M4 6h16M4 12h16M4 18h10') },
-  { path: '/me', label: 'Me', icon: icon('M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21a8 8 0 0 1 16 0') },
-] as const
+// The + always sits in the centre: tabs split into a left and a right group.
+const LEFT: Tab[] = [
+  { path: '/', label: 'Today', icon: 'today' },
+  { path: '/history', label: 'History', icon: 'history' },
+]
+const RIGHT: Tab[] = [{ path: '/me', label: 'Me', icon: 'me' }]
+
+const ROUTES: Record<string, () => React.ReactNode> = {
+  '/': Today,
+  '/history': History,
+  '/me': Me,
+  '/me/targets': MeTargets,
+}
 
 export default function App() {
   const session = useSession()
@@ -43,39 +57,48 @@ function Shell({ userId }: { userId: string }) {
     return startAutoSync()
   }, [userId])
 
-  const screen = path === '/history' ? <History /> : path === '/me' ? <Me /> : <Today />
+  const Screen = ROUTES[path] ?? Today
+  // A sub-screen keeps its parent tab highlighted.
+  const section = '/' + (path.split('/')[1] ?? '')
 
-  const tab = (t: (typeof TABS)[number]) => (
+  const tab = (t: Tab) => (
     <a
       key={t.path}
       href={t.path}
       className="tab"
-      aria-current={path === t.path ? 'page' : undefined}
+      aria-current={section === t.path ? 'page' : undefined}
       onClick={(e) => {
         e.preventDefault()
         navigate(t.path)
       }}
     >
-      {t.icon}
+      <Icon name={t.icon} size={24} strokeWidth={section === t.path ? 2.1 : 1.8} />
       <span>{t.label}</span>
     </a>
   )
 
   return (
     <>
-      <main className="main">{screen}</main>
+      <main className="main">
+        <Screen />
+      </main>
 
       <nav className="tabbar" aria-label="Main">
-        {tab(TABS[0])}
-        {tab(TABS[1])}
+        <div className="tab-group">{LEFT.map(tab)}</div>
         <button type="button" className="tab tab-add" aria-label="Quick add" onClick={() => openSheet({ kind: 'quick-add' })}>
-          <span className="add-disc">{icon('M12 5v14M5 12h14')}</span>
+          <span className="add-disc">
+            <Icon name="plus" size={24} strokeWidth={2.4} />
+          </span>
         </button>
-        {tab(TABS[2])}
+        <div className="tab-group">{RIGHT.map(tab)}</div>
       </nav>
 
       {sheet.kind === 'quick-add' && <QuickAddSheet />}
       {sheet.kind === 'money' && <MoneySheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} prefill={sheet.prefill} />}
+      {sheet.kind === 'sleep' && <SleepSheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} />}
+      {sheet.kind === 'weight' && <WeightSheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} />}
+      {sheet.kind === 'activity' && <ActivitySheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} />}
+      {sheet.kind === 'checkin' && <CheckinSheet key={sheet.date ?? 'today'} date={sheet.date} />}
       <Toaster />
     </>
   )

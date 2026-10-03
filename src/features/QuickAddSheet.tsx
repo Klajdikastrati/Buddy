@@ -5,6 +5,8 @@ import { searchItems } from '../core/recents'
 import type { Item } from '../core/types'
 import { db } from '../data/db'
 import { logItem, setEntryDeleted } from '../data/repo'
+import { DOMAIN, type DomainKey } from '../ui/domains'
+import { Icon, IconChip } from '../ui/icons'
 import { closeSheet, openSheet } from '../ui/sheets'
 import { Sheet } from '../ui/Sheet'
 import { toast } from '../ui/toast'
@@ -32,36 +34,56 @@ export function QuickAddSheet() {
   }
 
   const q = query.trim()
+  const actions: { domain: DomainKey; open: () => void }[] = [
+    { domain: 'expense', open: () => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q || undefined } }) },
+    { domain: 'income', open: () => openSheet({ kind: 'money', prefill: { kind: 'income', title: q || undefined } }) },
+    { domain: 'sleep', open: () => openSheet({ kind: 'sleep' }) },
+    { domain: 'weight', open: () => openSheet({ kind: 'weight' }) },
+    { domain: 'activity', open: () => openSheet({ kind: 'activity' }) },
+    { domain: 'checkin', open: () => openSheet({ kind: 'checkin' }) },
+  ]
 
   return (
     <Sheet open onClose={closeSheet} title="Quick add">
       <div className="quick-actions">
-        <button type="button" className="action" onClick={() => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q || undefined } })}>
-          Expense
-        </button>
-        <button type="button" className="action" onClick={() => openSheet({ kind: 'money', prefill: { kind: 'income', title: q || undefined } })}>
-          Income
-        </button>
+        {actions.map((a) => (
+          <button key={a.domain} type="button" className="action" onClick={a.open}>
+            <IconChip name={DOMAIN[a.domain].icon} tint={DOMAIN[a.domain].tint} size="lg" />
+            {DOMAIN[a.domain].label}
+          </button>
+        ))}
       </div>
 
-      <input
-        className="input"
-        type="search"
-        autoComplete="off"
-        placeholder="Search…"
-        aria-label="Search items"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
+      <div className="search">
+        <Icon name="search" size={18} />
+        <input
+          className="input"
+          type="search"
+          autoComplete="off"
+          placeholder="Search…"
+          aria-label="Search items"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
 
       {items && items.length > 0 && <h3 className="section-label">{q ? 'Matches' : 'Recent'}</h3>}
-      <ul className="list">
+      <ul className="list with-icons">
         {list.map((item) => (
           <li key={item.id} className="list-row">
+            <span className="row-icon">
+              <IconChip name={DOMAIN[item.kind].icon} tint={DOMAIN[item.kind].tint} />
+            </span>
             <button type="button" className="row-main" onClick={() => repeat(item)}>
               <span className="row-title">{item.name}</span>
               <span className="row-sub">
-                {item.kind === 'income' ? 'Income' : item.money?.categoryId ? catName.get(item.money.categoryId) : 'Expense'}
+                {item.kind === 'food'
+                  ? (item.food?.servingLabel ?? `${item.food?.grams ?? ''} g`)
+                  : item.kind === 'income'
+                    ? 'Income'
+                    : item.money?.categoryId
+                      ? catName.get(item.money.categoryId)
+                      : 'Expense'}
               </span>
             </button>
             {item.money && (
