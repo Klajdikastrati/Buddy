@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo } from 'react'
 import { ACTIVITY_LABEL, activityOn, sleepSummary, weightSummary } from '../core/body'
-import { addDays, formatDuration, formatLongDate, formatShortDate, hourIn, monthStart, weekdayOf, weekStart } from '../core/dates'
+import { addDays, formatDuration, formatShortDate, hourIn, monthStart, weekdayOf, weekStart } from '../core/dates'
 import { formatMoney, moneySummary } from '../core/money'
 import { nutritionOn } from '../core/nutrition'
 import { priorities } from '../core/plan'
@@ -10,7 +10,6 @@ import { targetOn } from '../core/targets'
 import { durationMin, finishedWorkouts, templatesOn, workoutsInWeek } from '../core/training'
 import type { DayCheckin, Entry, ID, LocalDate, Target, WorkoutTemplate } from '../core/types'
 import { db } from '../data/db'
-import { startWorkout } from '../data/repo-training'
 import { Bar } from '../ui/Bar'
 import { DOMAIN, type DomainKey } from '../ui/domains'
 import { openEntry } from '../ui/entryActions'
@@ -18,7 +17,6 @@ import { EntryRow } from '../ui/EntryRow'
 import { navigate, useSettings, useToday } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
 import { PlanRow } from '../ui/PlanRow'
-import { Ring } from '../ui/Ring'
 import { openSheet } from '../ui/sheets'
 
 /** After this hour (local) Today asks for the day's check-in if it's missing. */
@@ -55,24 +53,31 @@ export function Today() {
   const evening = hourIn(new Date(), settings.timezone) >= EVENING_HOUR
 
   return (
-    <div className="screen">
-      <header className="screen-head">
-        <span className="eyebrow">{formatLongDate(today)}</span>
+    <div className="screen today">
+      <header className="today-head">
         <h1>Today</h1>
+        <span className="today-date">{formatShortDate(today)}</span>
       </header>
+
+      <div className="tiles">
+        <CaloriesTile entries={entries} today={today} targets={targets} />
+        <MoneyTile entries={entries} today={today} targets={targets} firstDay={firstDay} currency={settings.currency} />
+        <BodyTiles entries={entries} weights={weights} today={today} targets={targets} todays={todays} />
+        <WorkoutTile entries={entries} today={today} targets={targets} templates={templates} active={activeWorkout} />
+      </div>
 
       {top.shown.length > 0 && (
         <section aria-labelledby="prio-h">
-          <div className="row-between">
-            <h2 id="prio-h" className="section-title">
+          <div className="label-row">
+            <h2 id="prio-h" className="section-label">
               Priorities
             </h2>
-            <button type="button" className="btn-text" onClick={() => navigate('/plan')}>
+            <button type="button" className="btn-text small" onClick={() => navigate('/plan')}>
               {top.more ? `+${top.more} more` : 'Plan'}
-              <Icon name="chevronRight" size={16} strokeWidth={2.2} />
+              <Icon name="chevronRight" size={14} strokeWidth={2.4} />
             </button>
           </div>
-          <ul className="list plan-list">
+          <ul className="list plan-list dense">
             {top.shown.map((t) => (
               <PlanRow key={t.id} item={t} today={today} sub={t.localDate && t.localDate < today ? `From ${formatShortDate(t.localDate)}` : undefined} />
             ))}
@@ -80,22 +85,14 @@ export function Today() {
         </section>
       )}
 
-      {!activeWorkout && <PlannedWorkout entries={entries} templates={templates} today={today} />}
-
-      <CaloriesCard entries={entries} today={today} targets={targets} />
-
-      <MoneyBlock entries={entries} today={today} targets={targets} firstDay={firstDay} currency={settings.currency} />
-
-      <BodyTiles entries={entries} weights={weights} today={today} targets={targets} todays={todays} />
-
       <CheckinRow checkin={checkin} evening={evening} />
 
       <section aria-labelledby="entries-h">
-        <h2 id="entries-h" className="section-title">
+        <h2 id="entries-h" className="section-label">
           Logged today
         </h2>
         {todays.length ? (
-          <ul className="list with-icons">
+          <ul className="list with-icons dense">
             {todays.map((e) => (
               <EntryRow
                 key={e.id}
@@ -120,7 +117,69 @@ export function Today() {
   )
 }
 
-function MoneyBlock({
+const tintStyle = (d: DomainKey) => ({ '--tint': DOMAIN[d].tint }) as React.CSSProperties
+
+/** Compact tile: label, one number (+ small unit), optional progress bar, a short note (at most 2 lines). */
+function Tile({
+  domain,
+  label,
+  value,
+  unit,
+  note,
+  bar,
+  onClick,
+}: {
+  domain: DomainKey
+  label?: string
+  value: string
+  unit?: string
+  note: string
+  bar?: { value: number; max: number; label: string }
+  onClick: () => void
+}) {
+  const d = DOMAIN[domain]
+  return (
+    <button type="button" className="tile" onClick={onClick} style={tintStyle(domain)}>
+      <span className="tile-head">
+        <IconChip name={d.icon} tint={d.tint} size="sm" />
+        <span className="tile-label">{label ?? d.label}</span>
+      </span>
+      <span className={`tile-value num ${value === '—' ? 'empty-value' : ''}`}>
+        {value}
+        {unit && <span className="tile-unit"> {unit}</span>}
+      </span>
+      {bar && <Bar value={bar.value} max={bar.max} label={bar.label} />}
+      <span className="tile-note num">{note}</span>
+    </button>
+  )
+}
+
+/** Calories vs target (bar) and protein. Taps through to the day's nutrition. */
+function CaloriesTile({ entries, today, targets }: { entries: Entry[]; today: LocalDate; targets: Target[] }) {
+  const d = nutritionOn(entries, today)
+  const kcal = d.totals.kcal ?? 0
+  const target = targetOn(targets, 'kcal_daily', today)
+  const protein = d.totals.proteinG
+  const proteinTarget = targetOn(targets, 'protein_daily', today)
+  const parts = [
+    d.count === 0 ? 'Nothing logged' : target == null ? null : kcal <= target ? `${formatNumber(target - kcal, 0)} left` : `${formatNumber(kcal - target, 0)} over`,
+    protein != null ? `P ${formatNumber(protein, 0)}${proteinTarget != null ? `/${formatNumber(proteinTarget, 0)}` : ''} g` : null,
+  ]
+  return (
+    <Tile
+      domain="food"
+      label="Calories"
+      value={`${d.unknown.kcal ? '≥' : ''}${formatNumber(kcal, 0)}`}
+      unit={target != null ? `/ ${formatNumber(target, 0)}` : 'kcal'}
+      bar={target != null ? { value: kcal, max: target, label: 'Calories vs target' } : undefined}
+      note={parts.filter(Boolean).join(' · ') || `${d.count} ${d.count === 1 ? 'item' : 'items'}`}
+      onClick={() => navigate('/nutrition')}
+    />
+  )
+}
+
+/** Spent today; with a budget, how much is left this month and per day. */
+function MoneyTile({
   entries,
   today,
   targets,
@@ -134,125 +193,23 @@ function MoneyBlock({
   currency: string
 }) {
   const s = moneySummary(entries, today, targetOn(targets, 'budget_month', today), firstDay)
-  const diff = s.dailyAverage == null ? null : s.spentToday - s.dailyAverage
+  // The big number already says "Lek"; the note stays short enough for one line.
+  const amt = (n: number) => (cur === 'ALL' ? formatNumber(n, 0) : formatMoney(n, cur))
+  let note = `${amt(s.spentMonth)} this month`
+  if (s.budget != null && s.remainingMonth != null) {
+    note =
+      s.remainingMonth < 0
+        ? `${amt(-s.remainingMonth)} over budget`
+        : `${amt(s.remainingMonth)} left${s.perDayLeft != null && s.perDayLeft > 0 ? ` · ${amt(s.perDayLeft)}/day` : ''}`
+  }
   return (
-    <section className="block" aria-labelledby="money-h" style={tintStyle('money')}>
-      <CardHead id="money-h" domain="money" />
-      <p className="stat">
-        <span className="stat-value num">{formatMoney(s.spentToday, cur)}</span>
-        <span className="stat-unit">today</span>
-      </p>
-      {diff != null && Math.round(diff) !== 0 && (
-        <p className="stat-note num">
-          {formatMoney(Math.abs(diff), cur)} {diff < 0 ? 'below' : 'above'} your daily average
-        </p>
-      )}
-
-      <div className="month">
-        {s.budget != null && s.remainingMonth != null ? (
-          <>
-            <div className="month-line">
-              <span className="num">{formatMoney(s.spentMonth, cur)} spent this month</span>
-              <span className={`num ${s.remainingMonth < 0 ? 'over' : ''}`}>
-                {s.remainingMonth < 0
-                  ? `${formatMoney(-s.remainingMonth, cur)} over`
-                  : `${formatMoney(s.remainingMonth, cur)} left`}
-              </span>
-            </div>
-            <Bar value={s.spentMonth} max={s.budget} label="Monthly budget used" />
-            {s.perDayLeft != null && s.perDayLeft > 0 && (
-              <p className="stat-note num">{formatMoney(s.perDayLeft, cur)} a day for the rest of the month</p>
-            )}
-          </>
-        ) : (
-          <div className="month-line">
-            <span className="num">{formatMoney(s.spentMonth, cur)} spent this month</span>
-            <button type="button" className="btn-text" onClick={() => navigate('/me/targets')}>
-              Set budget
-            </button>
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-const tintStyle = (d: DomainKey) => ({ '--tint': DOMAIN[d].tint }) as React.CSSProperties
-
-/** Calories vs target as a ring, protein as a bar. Taps through to the day's nutrition. */
-function CaloriesCard({ entries, today, targets }: { entries: Entry[]; today: LocalDate; targets: Target[] }) {
-  const d = nutritionOn(entries, today)
-  const kcal = d.totals.kcal ?? 0
-  const target = targetOn(targets, 'kcal_daily', today)
-  const protein = d.totals.proteinG
-  const proteinTarget = targetOn(targets, 'protein_daily', today)
-  const gap = (n: number) => `${d.unknown.kcal ? '≥' : ''}${formatNumber(n, 0)}`
-  return (
-    <button type="button" className="block" onClick={() => navigate('/nutrition')} style={tintStyle('food')}>
-      <CardHead domain="food" label="Calories" chevron />
-      <div className="cal-row">
-        {target != null && (
-          <Ring value={kcal} max={target} size={76} stroke={10} tint={DOMAIN.food.tint} label={`${formatNumber(kcal, 0)} of ${formatNumber(target, 0)} kcal`}>
-            <span className="ring-pct num">{Math.round((kcal / target) * 100)}%</span>
-          </Ring>
-        )}
-        <div className="grow">
-          <p className="stat">
-            <span className="stat-value num">{gap(kcal)}</span>
-            <span className="stat-unit">{target != null ? `/ ${formatNumber(target, 0)} kcal` : 'kcal'}</span>
-          </p>
-          <p className="stat-note num">
-            {d.count === 0
-              ? 'Nothing logged yet'
-              : target == null
-                ? `${d.count} ${d.count === 1 ? 'item' : 'items'} today`
-                : kcal <= target
-                  ? `${formatNumber(target - kcal, 0)} left`
-                  : `${formatNumber(kcal - target, 0)} over`}
-            {d.unknown.kcal > 0 && ` · ${d.unknown.kcal} without kcal`}
-          </p>
-        </div>
-      </div>
-      {(protein != null || proteinTarget != null) && (
-        <div className="month">
-          <div className="month-line">
-            <span>Protein</span>
-            <span className="num">
-              {protein == null ? '—' : `${d.unknown.proteinG ? '≥' : ''}${formatNumber(protein, 0)} g`}
-              {proteinTarget != null && <span className="muted"> / {formatNumber(proteinTarget, 0)} g</span>}
-            </span>
-          </div>
-          {proteinTarget != null && <Bar value={protein ?? 0} max={proteinTarget} label="Protein vs target" />}
-        </div>
-      )}
-    </button>
-  )
-}
-
-/** Domain icon + name heading a Today card. */
-export function CardHead({ id, domain, label, chevron }: { id?: string; domain: DomainKey; label?: string; chevron?: boolean }) {
-  return (
-    <div className="card-head">
-      <IconChip name={DOMAIN[domain].icon} tint={DOMAIN[domain].tint} size="sm" />
-      <h2 id={id} className="block-label">
-        {label ?? DOMAIN[domain].label}
-      </h2>
-      {chevron && <Icon name="chevronRight" size={18} className="chev" />}
-    </div>
-  )
-}
-
-function Tile({ domain, value, note, onClick }: { domain: DomainKey; value: string; note: string; onClick: () => void }) {
-  const d = DOMAIN[domain]
-  return (
-    <button type="button" className="tile" onClick={onClick} style={tintStyle(domain)}>
-      <span className="tile-head">
-        <IconChip name={d.icon} tint={d.tint} size="sm" />
-        <span className="tile-label">{d.label}</span>
-      </span>
-      <span className={`tile-value num ${value === '—' ? 'empty-value' : ''}`}>{value}</span>
-      <span className="tile-note num">{note}</span>
-    </button>
+    <Tile
+      domain="money"
+      value={formatMoney(s.spentToday, cur)}
+      bar={s.budget != null ? { value: s.spentMonth, max: s.budget, label: 'Monthly budget used' } : undefined}
+      note={note}
+      onClick={() => openSheet({ kind: 'money', prefill: { kind: 'expense' } })}
+    />
   )
 }
 
@@ -277,11 +234,7 @@ function BodyTiles({
   if (sleep.today != null) {
     const diff = sleep.average == null ? null : sleep.today - sleep.average
     sleepNote =
-      diff == null
-        ? 'No 30-day average yet'
-        : Math.abs(diff) < 5
-          ? 'Same as 30-day avg'
-          : `${formatDuration(diff)} ${diff < 0 ? 'below' : 'above'} 30-day avg`
+      diff == null ? 'No average yet' : Math.abs(diff) < 5 ? 'Same as 30-day avg' : `${diff < 0 ? '−' : '+'}${formatDuration(diff)} vs 30-day avg`
   }
 
   const weight = weightSummary(weights)
@@ -294,7 +247,7 @@ function BodyTiles({
           : formatShortDate(weight.latest.localDate)
         : weight.change === 0
           ? `Same as ${weight.changeDays} days ago`
-          : `${signed(weight.change)} kg vs ${weight.changeDays} days ago`
+          : `${signed(weight.change)} kg in ${weight.changeDays} days`
   }
 
   const act = activityOn(entries, today)
@@ -324,7 +277,7 @@ function BodyTiles({
     : 'Nothing yet'
 
   return (
-    <div className="tiles">
+    <>
       <Tile
         domain="sleep"
         value={sleep.today != null ? formatDuration(sleep.today) : '—'}
@@ -338,56 +291,50 @@ function BodyTiles({
         onClick={() => openSheet({ kind: 'weight' })}
       />
       <Tile domain="activity" value={actValue} note={actNote} onClick={() => openSheet({ kind: 'activity' })} />
-      <WorkoutTile entries={entries} today={today} targets={targets} />
-    </div>
+    </>
   )
 }
 
-function WorkoutTile({ entries, today, targets }: { entries: Entry[]; today: LocalDate; targets: Target[] }) {
+/** In progress → resume; planned today → start; otherwise workouts this week. */
+function WorkoutTile({
+  entries,
+  today,
+  targets,
+  templates,
+  active,
+}: {
+  entries: Entry[]
+  today: LocalDate
+  targets: Target[]
+  templates: WorkoutTemplate[]
+  active: ID | null
+}) {
   const week = workoutsInWeek(entries, weekStart(today))
   const target = targetOn(targets, 'workouts_week', today)
-  const doneToday = finishedWorkouts(entries).find((w) => w.localDate === today)
+  const finished = finishedWorkouts(entries)
+  const doneToday = finished.find((w) => w.localDate === today)
+  const doneTemplates = new Set(finished.flatMap((w) => (w.localDate === today && w.workout!.templateId ? [w.workout!.templateId] : [])))
+  const planned = templatesOn(templates, weekdayOf(today)).filter((t) => !doneTemplates.has(t.id))
+
+  if (active) return <Tile domain="workout" value="In progress" note="Tap to resume" onClick={() => navigate('/workout')} />
+  if (planned.length) {
+    return (
+      <Tile
+        domain="workout"
+        value={planned[0].name}
+        note={`Planned today · tap to start${planned.length > 1 ? ` · +${planned.length - 1}` : ''}`}
+        onClick={() => openSheet({ kind: 'workout-start' })}
+      />
+    )
+  }
   const mins = doneToday ? durationMin(doneToday) : null
   return (
     <Tile
       domain="workout"
       value={target != null ? `${week} / ${target}` : String(week)}
-      note={doneToday ? `${doneToday.title}${mins != null ? ` · ${formatDuration(mins)}` : ''}` : week === 1 && target == null ? 'workout this week' : 'this week'}
+      note={doneToday ? `${doneToday.title}${mins != null ? ` · ${formatDuration(mins)}` : ''}` : 'this week'}
       onClick={() => navigate('/training')}
     />
-  )
-}
-
-/** "Pull Day · Start" for templates planned today that haven't been done today. */
-function PlannedWorkout({ entries, templates, today }: { entries: Entry[]; templates: WorkoutTemplate[]; today: LocalDate }) {
-  const doneToday = new Set(finishedWorkouts(entries).flatMap((w) => (w.localDate === today && w.workout!.templateId ? [w.workout!.templateId] : [])))
-  const planned = templatesOn(templates, weekdayOf(today)).filter((t) => !doneToday.has(t.id))
-  if (!planned.length) return null
-  const t = planned[0]
-  return (
-    <div className="block planned" style={tintStyle('workout')}>
-      <div className="planned-row">
-        <IconChip name="workout" tint={DOMAIN.workout.tint} size="md" />
-        <div className="grow">
-          <p className="planned-name">{t.name}</p>
-          <p className="row-sub">
-            Planned today · {t.exercises.length} {t.exercises.length === 1 ? 'exercise' : 'exercises'}
-            {planned.length > 1 ? ` · +${planned.length - 1} more` : ''}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="btn btn-primary btn-small"
-          onClick={async () => {
-            await startWorkout(t)
-            navigate('/workout')
-          }}
-        >
-          <Icon name="play" size={16} />
-          Start
-        </button>
-      </div>
-    </div>
   )
 }
 

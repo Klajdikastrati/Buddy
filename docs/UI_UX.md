@@ -8,10 +8,11 @@ Phase 5. Quick Add is the centre action; everything else lives deeper. Sub-scree
 and keep their parent tab highlighted.
 
 ## Today
-Answers "how is today going?" with one number + one comparison per domain. Money card: spent today, vs daily
-average (only over days since you started), month spent / left vs budget, per-day allowance. Tiles (2 columns):
-Sleep (vs 30-day avg of logged nights), Weight (Δ vs ~7 days), Activity (minutes/km/steps). Check-in row once done;
-after 19:00 a "How was today?" prompt if it isn't. Then today's entries.
+Answers "how is today going?" with one number + one comparison per domain — **everything above the fold, no
+scrolling to see the numbers** (user preference). One-line header, then a 2-column grid of compact tiles: Calories
+(bar vs target, left, protein), Money (spent today, bar vs budget, left · per day), Sleep (vs 30-day avg), Weight
+(Δ over ~7 days), Activity, Workout (in progress → resume; planned today → start; else this week). Then ≤3
+priorities, the check-in row (evening prompt if missing), and today's entries in dense rows.
 
 ## Quick Add
 - Opens instantly. A 4-column grid of icon actions (Food, Expense, Workout, Sleep, Weight, Activity, Check-in,
