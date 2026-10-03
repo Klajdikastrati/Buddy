@@ -1,6 +1,8 @@
 import { useLiveQuery } from '../ui/live'
 import { useMemo, useState } from 'react'
 import { formatMoney } from '../core/money'
+import { searchBase } from '../core/foodbase'
+import { searchFoods } from '../core/nutrition'
 import { formatNumber } from '../core/numbers'
 import { searchItems } from '../core/recents'
 import type { Item } from '../core/types'
@@ -48,6 +50,19 @@ export function QuickAddSheet() {
   }
 
   const q = query.trim()
+  // Typing a food name finds it here too: your foods first, then built-in common foods.
+  const foodHits = useMemo(() => {
+    if (!q || !foods) return []
+    const loggedIds = new Set(list.map((i) => i.food?.foodId))
+    const mine = searchFoods(foods, q, Date.now(), 4).filter((f) => !loggedIds.has(f.id))
+    const savedSources = new Set(foods.filter((f) => !f.deletedAt && f.sourceId).map((f) => f.sourceId))
+    const common = searchBase(q, 4).filter((b) => !savedSources.has(b.draft.sourceId))
+    const kcal = (k: number | null, unit: string) => (k == null ? 'kcal ?' : `${formatNumber(k, 0)} kcal / 100 ${unit}`)
+    return [
+      ...mine.map((f) => ({ key: f.id, name: f.name, sub: kcal(f.kcal, f.basis === '100ml' ? 'ml' : 'g'), saved: f, draft: null })),
+      ...common.map((b) => ({ key: b.id, name: b.draft.name, sub: `${kcal(b.draft.kcal, b.draft.basis === '100ml' ? 'ml' : 'g')} · common food`, saved: null, draft: b.draft })),
+    ].slice(0, 5)
+  }, [q, foods, list])
   const actions: { key?: string; domain: DomainKey; label?: string; open: () => void }[] = [
     { domain: 'food', open: () => openSheet({ kind: 'food', query: q || undefined }) },
     { domain: 'expense', open: () => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q || undefined } }) },
@@ -114,10 +129,34 @@ export function QuickAddSheet() {
         ))}
       </ul>
 
+      {foodHits.length > 0 && (
+        <>
+          <h3 className="section-label">Food</h3>
+          <ul className="list with-icons">
+            {foodHits.map((h) => (
+              <li key={h.key} className="list-row">
+                <span className="row-icon">
+                  <IconChip name="food" tint={DOMAIN.food.tint} />
+                </span>
+                <button type="button" className="row-main" onClick={() => openSheet(h.saved ? { kind: 'food', food: h.saved } : { kind: 'food', draft: h.draft! })}>
+                  <span className="row-title">{h.name}</span>
+                  <span className="row-sub num">{h.sub}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       {q && (
-        <button type="button" className="btn btn-quiet full" onClick={() => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q } })}>
-          Add “{q}”
-        </button>
+        <div className="pair">
+          <button type="button" className="btn btn-quiet" onClick={() => openSheet({ kind: 'food', query: q })}>
+            Food “{q}”
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={() => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q } })}>
+            Expense “{q}”
+          </button>
+        </div>
       )}
       {items && items.length === 0 && <p className="muted">Things you log appear here for one-tap repeats.</p>}
     </Sheet>

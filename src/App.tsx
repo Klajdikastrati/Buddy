@@ -163,7 +163,7 @@ function Shell({ userId }: { userId: string }) {
       {sheet.kind === 'weight' && <WeightSheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} />}
       {sheet.kind === 'activity' && <ActivitySheet key={sheet.entry?.id ?? 'new'} entry={sheet.entry} />}
       {sheet.kind === 'checkin' && <CheckinSheet key={sheet.date ?? 'today'} date={sheet.date} />}
-      {sheet.kind === 'food' && <FoodSheet key={sheet.entry?.id ?? sheet.food?.id ?? 'new'} entry={sheet.entry} food={sheet.food} query={sheet.query} />}
+      {sheet.kind === 'food' && <FoodSheet key={sheet.entry?.id ?? sheet.food?.id ?? 'new'} entry={sheet.entry} food={sheet.food} draft={sheet.draft} query={sheet.query} />}
       {sheet.kind === 'food-edit' && <FoodEditorSheet key={sheet.food?.id ?? 'new'} food={sheet.food} draft={sheet.draft} logAfter={sheet.logAfter} />}
       {sheet.kind === 'recipe' && <RecipeSheet key={sheet.food?.id ?? 'new'} food={sheet.food} />}
       {sheet.kind === 'workout-start' && <WorkoutStartSheet />}

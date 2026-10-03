@@ -1,14 +1,16 @@
 import type { Analysis } from '../core/analyst'
 import { targetOn } from '../core/targets'
-import type { AnalystRun, LocalDate, Recommendation, Synced, TargetKey } from '../core/types'
+import { addDays, weekStart } from '../core/dates'
+import type { AnalystRun, LocalDate, PlanProposal, Recommendation, Synced } from '../core/types'
 import { db } from './db'
 import { created, now, patch, put } from './repo-base'
 import { setTarget } from './repo'
+import { addPlanItem } from './repo-plan'
 
 export type RunInput = Omit<AnalystRun, keyof Synced | 'importedAt'>
 export type ProposalInput = Pick<
   Recommendation,
-  'type' | 'targetKey' | 'currentValue' | 'suggestedValue' | 'unit' | 'reason' | 'confidence'
+  'type' | 'targetKey' | 'currentValue' | 'suggestedValue' | 'unit' | 'details' | 'reason' | 'confidence'
 >
 
 const same = (a: number | null, b: number | null) => (a == null || b == null ? a === b : Math.abs(a - b) < 0.005)
@@ -28,12 +30,13 @@ export async function importAnalystRun(run: RunInput, proposals: ProposalInput[]
   return db.transaction('rw', [db.analystRuns, db.recommendations, db.outbox], async () => {
     const row = await put<AnalystRun>('analystRuns', { ...created(t), ...run, importedAt: t })
     for (const p of proposals) {
-      const live = targetOn(targets, p.targetKey, today)
+      // Plan items can't go stale; a target proposal is stale if Buddy's value moved.
+      const stale = p.type === 'target' && p.targetKey != null && !isCurrent(p, targetOn(targets, p.targetKey, today))
       await put<Recommendation>('recommendations', {
         ...created(t),
         ...p,
         runId: row.id,
-        status: isCurrent(p, live) ? 'pending' : 'stale',
+        status: stale ? 'stale' : 'pending',
         decidedAt: null,
       })
     }
@@ -46,7 +49,13 @@ export async function importAnalystRun(run: RunInput, proposals: ProposalInput[]
  * Re-checks the live value first; if it moved meanwhile, the proposal goes stale instead.
  */
 export async function applyRecommendation(rec: Recommendation, today: LocalDate): Promise<'applied' | 'stale'> {
-  const live = targetOn(await db.targets.toArray(), rec.targetKey as TargetKey, today)
+  if (rec.type === 'plan_item' && rec.details) {
+    await addPlanItem(planInput(rec.details, today))
+    await patch('recommendations', rec, { status: 'accepted', decidedAt: now() })
+    return 'applied'
+  }
+  if (rec.targetKey == null || rec.suggestedValue == null || rec.unit == null) return 'stale'
+  const live = targetOn(await db.targets.toArray(), rec.targetKey, today)
   if (!isCurrent(rec, live)) {
     await patch('recommendations', rec, { status: 'stale' })
     return 'stale'
@@ -80,16 +89,49 @@ export async function importAnalysis(a: Analysis, today: LocalDate): Promise<{ r
       model: a.analysis.model,
       payload: a,
     },
-    a.proposed_changes.map((p) => ({
-      type: p.type,
-      targetKey: p.target_key,
-      currentValue: p.current_value,
-      suggestedValue: p.suggested_value,
-      unit: p.unit,
-      reason: p.reason,
-      confidence: p.confidence,
-    })),
+    a.proposed_changes.map((p) =>
+      p.type === 'plan_item'
+        ? {
+            type: 'plan_item' as const,
+            targetKey: null,
+            currentValue: null,
+            suggestedValue: null,
+            unit: null,
+            details: { kind: p.kind, title: p.title, weekdays: p.weekdays, week: p.week, date: p.date },
+            reason: p.reason,
+            confidence: p.confidence,
+          }
+        : {
+            type: 'target' as const,
+            targetKey: p.target_key,
+            currentValue: p.current_value,
+            suggestedValue: p.suggested_value,
+            unit: p.unit,
+            details: null,
+            reason: p.reason,
+            confidence: p.confidence,
+          },
+    ),
     today,
   )
   return { run, proposals: a.proposed_changes.length }
+}
+
+/** Where an accepted plan proposal lands, relative to the day it is applied. */
+export function planInput(d: PlanProposal, today: LocalDate) {
+  return {
+    kind: d.kind,
+    title: d.title,
+    weekdays: d.kind === 'routine' ? d.weekdays : [],
+    localDate:
+      d.kind === 'goal'
+        ? addDays(weekStart(today), d.week === 'next' ? 7 : 0)
+        : d.kind === 'task'
+          ? d.date && d.date > today
+            ? d.date
+            : d.date
+              ? today
+              : null
+          : null,
+  }
 }

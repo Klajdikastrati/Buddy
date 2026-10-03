@@ -1,7 +1,7 @@
 import { useLiveQuery } from '../ui/live'
 import { useRef, useState } from 'react'
-import { validateAnalysis, type Analysis } from '../core/analyst'
-import { formatShortDate } from '../core/dates'
+import { validateAnalysis, type Analysis, type ProposedTarget } from '../core/analyst'
+import { formatShortDate, formatWeekdays } from '../core/dates'
 import { formatTarget, targetDef, targetOn } from '../core/targets'
 import type { AnalystRun, Recommendation, TargetKey } from '../core/types'
 import { db } from '../data/db'
@@ -29,7 +29,8 @@ export function MeAnalyst() {
 
   const cur = settings.currency
   const live = (key: string) => targetOn(targets, key as TargetKey, today)
-  const fmt = (key: string, v: number | null) => (v == null ? 'none' : formatTarget(key as TargetKey, v, cur))
+  const fmt = (key: string | null, v: number | null) => (v == null || key == null ? 'none' : formatTarget(key as TargetKey, v, cur))
+  const label = (r: Recommendation) => (r.targetKey ? targetDef(r.targetKey).label : 'Target')
   const runById = new Map(runs.map((r) => [r.id, r]))
   const open_ = recs.filter((r) => !r.decidedAt && (r.status === 'pending' || r.status === 'stale')).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const decided = recs.filter((r) => r.decidedAt).sort((a, b) => b.decidedAt!.localeCompare(a.decidedAt!))
@@ -53,7 +54,8 @@ export function MeAnalyst() {
   async function apply(rec: Recommendation) {
     const outcome = await applyRecommendation(rec, today)
     if (outcome === 'stale') return toast('Your target changed since this analysis — proposal marked stale.')
-    toast(`${targetDef(rec.targetKey).label} is now ${fmt(rec.targetKey, rec.suggestedValue)} from today`)
+    if (rec.type === 'plan_item') toast(`Added to Plan: ${rec.details?.title ?? ''}`)
+    else toast(`${label(rec)} is now ${fmt(rec.targetKey, rec.suggestedValue)} from today`)
   }
 
   return (
@@ -111,7 +113,8 @@ export function MeAnalyst() {
         {open_.length ? (
           <div className="stack">
             {open_.map((r) => {
-              const now = live(r.targetKey)
+              if (r.type === 'plan_item' && r.details) return <PlanProposalCard key={r.id} rec={r} onApply={() => void apply(r)} />
+              const now = live(r.targetKey ?? '')
               const stale = r.status === 'stale' || !isCurrent(r, now)
               const run = runById.get(r.runId)
               return (
@@ -119,7 +122,7 @@ export function MeAnalyst() {
                   <div className="card-head">
                     <IconChip name="target" tint={DOMAIN.analyst.tint} size="sm" />
                     <h3 className="block-label" style={{ color: 'var(--c-analyst)' }}>
-                      {targetDef(r.targetKey).label}
+                      {label(r)}
                     </h3>
                     <span className={`pill pill-${r.confidence}`}>{r.confidence} confidence</span>
                   </div>
@@ -171,10 +174,20 @@ export function MeAnalyst() {
               <li key={r.id} className="list-row">
                 <span className="row-main static">
                   <span className="row-title num">
-                    {targetDef(r.targetKey).label} · {fmt(r.targetKey, r.currentValue)} → {fmt(r.targetKey, r.suggestedValue)}
+                    {r.type === 'plan_item' && r.details
+                      ? `${PLAN_LABEL[r.details.kind]} · ${r.details.title}`
+                      : `${label(r)} · ${fmt(r.targetKey, r.currentValue)} → ${fmt(r.targetKey, r.suggestedValue)}`}
                   </span>
                   <span className="row-sub">
-                    {r.status === 'accepted' ? 'Applied' : r.status === 'stale' ? 'Out of date — dismissed' : 'Kept current'}
+                    {r.status === 'accepted'
+                      ? r.type === 'plan_item'
+                        ? 'Added to Plan'
+                        : 'Applied'
+                      : r.status === 'stale'
+                        ? 'Out of date — dismissed'
+                        : r.type === 'plan_item'
+                          ? 'Skipped'
+                          : 'Kept current'}
                     {r.decidedAt ? ` · ${formatShortDate(r.decidedAt.slice(0, 10))}` : ''}
                   </span>
                 </span>
@@ -206,7 +219,7 @@ export function MeAnalyst() {
 
 function reviewDays(run: AnalystRun | undefined, rec: Recommendation): number | null {
   const payload = run?.payload as Partial<Analysis> | undefined
-  return payload?.proposed_changes?.find((p) => p.target_key === rec.targetKey)?.review_after_days ?? null
+  return payload?.proposed_changes?.find((p): p is ProposedTarget => p.type === 'target' && p.target_key === rec.targetKey)?.review_after_days ?? null
 }
 
 /** Stored payloads are validated at import, but read defensively — the row syncs from the server. */
@@ -277,6 +290,41 @@ function RunCard({ run, open, onToggle }: { run: AnalystRun; open: boolean; onTo
           )}
         </div>
       )}
+    </article>
+  )
+}
+
+const PLAN_LABEL = { goal: 'Weekly goal', routine: 'Routine', task: 'Task' } as const
+
+function whenText(d: NonNullable<Recommendation['details']>): string {
+  if (d.kind === 'goal') return d.week === 'next' ? 'Next week' : 'This week'
+  if (d.kind === 'routine') return formatWeekdays(d.weekdays)
+  return d.date ? formatShortDate(d.date) : 'Someday'
+}
+
+/** A plan item the Analyst suggests: add it to Plan, or skip. */
+function PlanProposalCard({ rec, onApply }: { rec: Recommendation; onApply: () => void }) {
+  const d = rec.details!
+  return (
+    <article className="proposal">
+      <div className="card-head">
+        <IconChip name={d.kind === 'routine' ? 'repeat' : d.kind === 'goal' ? 'flag' : 'plan'} tint={DOMAIN.plan.tint} size="sm" />
+        <h3 className="block-label" style={{ color: 'var(--c-plan)' }}>
+          {PLAN_LABEL[d.kind]}
+        </h3>
+        <span className={`pill pill-${rec.confidence}`}>{rec.confidence} confidence</span>
+      </div>
+      <p className="proposal-title">{d.title}</p>
+      <p className="row-sub num">{whenText(d)}</p>
+      <p className="proposal-reason">{rec.reason}</p>
+      <div className="pair">
+        <button type="button" className="btn btn-quiet" onClick={() => void keepCurrent(rec).then(() => toast('Skipped'))}>
+          Skip
+        </button>
+        <button type="button" className="btn btn-primary" onClick={onApply}>
+          Add to plan
+        </button>
+      </div>
     </article>
   )
 }

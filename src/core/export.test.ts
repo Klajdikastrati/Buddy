@@ -107,6 +107,7 @@ const input: ExportInput = {
       currentValue: 120,
       suggestedValue: 150,
       unit: 'g',
+      details: null,
       reason: 'More training',
       confidence: 'medium',
       status: 'accepted',
@@ -180,7 +181,7 @@ describe('buddy-export v1', () => {
   it('carries signals with their sample size and the import contract', () => {
     expect(x.signals.min_n).toBe(14)
     expect(x.signals.correlations.find((s) => s.id === 'sleep-energy')).toMatchObject({ n: 0, ready: false, r: null })
-    expect(x.analysis_contract).toMatchObject({ file: 'buddy-analysis.json', schema_version: '1', proposed_change_types: ['target'] })
+    expect(x.analysis_contract).toMatchObject({ file: 'buddy-analysis.json', schema_version: '1', proposed_change_types: ['target', 'plan_item'] })
     expect(JSON.parse(JSON.stringify(x))).toEqual(x) // plain JSON, nothing lost
   })
 })

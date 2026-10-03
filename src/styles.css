@@ -2664,3 +2664,27 @@ section > .label-row {
 .resume-bar {
   bottom: calc(var(--nav-h) + var(--safe-b) + 6px);
 }
+
+/* Small text buttons keep a 44px tap area. */
+.btn-text.small {
+  position: relative;
+}
+
+.btn-text.small::after {
+  content: '';
+  position: absolute;
+  inset: -6px -4px;
+}
+
+.goal-line {
+  font-size: 14px;
+  color: var(--fg-2);
+  padding: 0 4px;
+  margin-top: -4px;
+}
+
+.proposal-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}

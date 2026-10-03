@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { activityOn, sleepByDay, trailingAverage, weightReadings } from '../core/body'
 import { addDays, formatDuration, formatShortDate } from '../core/dates'
 import { formatNumber } from '../core/numbers'
+import { targetOn } from '../core/targets'
 import type { Entry } from '../core/types'
 import { db } from '../data/db'
 import { DayChart } from '../ui/DayChart'
@@ -21,6 +22,7 @@ export function BodyDetail({ kind }: { kind: BodyKind }) {
   const settings = useSettings()
   const today = useToday(settings)
   const entries = useLiveQuery(() => db.entries.where('kind').equals(KINDS[kind]).toArray(), [kind])
+  const targets = useLiveQuery(() => db.targets.toArray(), [])
   const live = useMemo(() => (entries ?? []).filter((e) => !e.deletedAt).sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)), [entries])
   const head = <SubHead title={TITLE[kind]} back={() => navigate('/')} />
   if (!entries) return head
@@ -29,6 +31,8 @@ export function BodyDetail({ kind }: { kind: BodyKind }) {
 
   let stats: [string, string][] = []
   let chart: React.ReactNode = null
+  /** One line comparing against the target set in Me → Targets, if any. */
+  let goal: string | null = null
 
   if (kind === 'sleep') {
     const byDay = sleepByDay(live)
@@ -41,6 +45,14 @@ export function BodyDetail({ kind }: { kind: BodyKind }) {
       ['7-day avg', fmt(avg7)],
       ['30-day avg', fmt(avg30)],
     ]
+    const target = targets ? targetOn(targets, 'sleep_min', today) : null
+    if (target != null) {
+      const ref = avg7 ?? last
+      goal =
+        ref == null
+          ? `Target ${formatDuration(target)} a night`
+          : `Target ${formatDuration(target)} · 7-day average ${Math.abs(ref - target) < 5 ? 'on target' : `${formatDuration(ref - target)} ${ref < target ? 'below' : 'above'}`}`
+    }
     chart = (
       <DayChart
         points={days(30).map((d) => ({ date: d, value: byDay.get(d) ?? null }))}
@@ -69,6 +81,11 @@ export function BodyDetail({ kind }: { kind: BodyKind }) {
       ['vs 7 days', delta(7)],
       ['vs 30 days', delta(30)],
     ]
+    const target = targets ? targetOn(targets, 'weight_goal', today) : null
+    if (target != null) {
+      const gap = latest ? Math.round((latest.value - target) * 10) / 10 : null
+      goal = `Goal ${formatNumber(target)} kg${gap == null ? '' : gap === 0 ? ' · reached' : ` · ${formatNumber(Math.abs(gap))} kg to go`}`
+    }
     const lastPerDay = new Map(readings.map((r) => [r.localDate, r.value]))
     chart = (
       <DayChart
@@ -87,6 +104,8 @@ export function BodyDetail({ kind }: { kind: BodyKind }) {
       ['Km · 7d', formatNumber(sum('km'), 1)],
       ['Steps · 7d', formatNumber(sum('steps'), 0)],
     ]
+    const target = targets ? targetOn(targets, 'steps_daily', today) : null
+    if (target != null) goal = `Target ${formatNumber(target, 0)} steps a day · ${formatNumber(sum('steps') / 7, 0)} a day this week`
     chart = (
       <DayChart
         points={days(30).map((d) => ({ date: d, value: activityOn(live, d).minutes }))}
@@ -109,6 +128,7 @@ export function BodyDetail({ kind }: { kind: BodyKind }) {
           </div>
         ))}
       </div>
+      {goal && <p className="goal-line num">{goal}</p>}
       <section className="chart-card" aria-label={`${TITLE[kind]} trend`}>
         <span className="block-label" style={{ color: tint }}>
           {kind === 'weight' ? 'Last 60 days' : kind === 'sleep' ? 'Sleep per night · 30 days' : 'Active minutes · 30 days'}

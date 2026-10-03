@@ -12,7 +12,7 @@ export type SheetState =
   | { kind: 'activity'; entry?: Entry }
   | { kind: 'checkin'; date?: LocalDate }
   /** Log food: pick (search · scan · create) → amount. `food` skips straight to the amount. */
-  | { kind: 'food'; entry?: Entry; food?: Food; query?: string }
+  | { kind: 'food'; entry?: Entry; food?: Food; draft?: FoodDraft; query?: string }
   /** Create/edit a food; `logAfter` continues into logging it. */
   | { kind: 'food-edit'; food?: Food; draft?: Partial<FoodDraft>; logAfter?: boolean }
   | { kind: 'recipe'; food?: Food }

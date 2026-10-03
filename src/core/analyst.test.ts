@@ -28,7 +28,7 @@ describe('buddy-analysis v1 validation', () => {
     const r = validateAnalysis(valid(), 'ALL')
     expect(r.ok).toBe(true)
     if (!r.ok) return
-    expect(r.value.proposed_changes.map((p) => [p.target_key, p.current_value, p.suggested_value, p.review_after_days])).toEqual([
+    expect(r.value.proposed_changes.map((p) => (p.type === 'target' ? [p.target_key, p.current_value, p.suggested_value, p.review_after_days] : null))).toEqual([
       ['protein_daily', 150, 160, 28],
       ['budget_month', null, 55000, null],
     ])
@@ -71,7 +71,7 @@ describe('buddy-analysis v1 validation', () => {
     expect(r.ok).toBe(false)
     if (r.ok) return
     expect(r.errors).toEqual([
-      'proposed_changes[0].type: "delete_entries" is not supported (only "target")',
+      'proposed_changes[0].type: "delete_entries" is not supported (only "target" or "plan_item")',
       'proposed_changes[1].target_key: "salary" is not a target Buddy lets the Analyst change',
       'proposed_changes[2].suggested_value: equals the current value',
       'proposed_changes[3].injected: unknown field',
@@ -83,5 +83,45 @@ describe('buddy-analysis v1 validation', () => {
     const { insights: _i, recommendations: _r, warnings: _w, questions: _q, ...rest } = valid()
     const r = validateAnalysis({ ...rest, proposed_changes: [] }, 'ALL')
     expect(r.ok && r.value.insights).toEqual([])
+  })
+})
+
+describe('plan proposals', () => {
+  const base = () => ({ ...valid(), proposed_changes: [] as unknown[] })
+  it('accepts goals, routines and tasks', async () => {
+    const doc = base()
+    doc.proposed_changes = [
+      { id: 'g1', type: 'plan_item', kind: 'goal', title: 'Train 3 times', week: 'this', reason: 'Averaged 1.5/week', confidence: 'medium' },
+      { id: 'r1', type: 'plan_item', kind: 'routine', title: 'Lights out by 23:30', weekdays: [0, 1, 2, 3, 4], reason: 'Weeknight sleep 6h40', confidence: 'medium' },
+      { id: 't1', type: 'plan_item', kind: 'task', title: 'Set a food budget', date: null, reason: 'Food is 40% of spend', confidence: 'low' },
+    ]
+    const r = validateAnalysis(doc, 'ALL')
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.value.proposed_changes.map((p) => (p.type === 'plan_item' ? [p.kind, p.week, p.weekdays.join(''), p.date] : null))).toEqual([
+      ['goal', 'this', '', null],
+      ['routine', null, '01234', null],
+      ['task', null, '', null],
+    ])
+    const { planInput } = await import('../data/repo-analyst')
+    expect(planInput({ kind: 'goal', title: 'x', weekdays: [], week: 'next', date: null }, '2026-10-03').localDate).toBe('2026-10-05')
+    expect(planInput({ kind: 'task', title: 'x', weekdays: [], week: null, date: '2026-09-01' }, '2026-10-03').localDate).toBe('2026-10-03')
+  })
+
+  it('rejects malformed plan items', () => {
+    const doc = base()
+    doc.proposed_changes = [
+      { id: 'r1', type: 'plan_item', kind: 'routine', title: 'Walk', weekdays: [], reason: 'r', confidence: 'low' },
+      { id: 'g1', type: 'plan_item', kind: 'goal', title: 'Run', reason: 'r', confidence: 'low' },
+      { id: 'x1', type: 'plan_item', kind: 'habit', title: 'Read', reason: 'r', confidence: 'low' },
+    ]
+    const r = validateAnalysis(doc, 'ALL')
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.errors).toEqual([
+      'proposed_changes[0].weekdays: a routine needs distinct weekdays 0–6 (0 = Sunday)',
+      'proposed_changes[1].week: a goal needs week "this" or "next"',
+      'proposed_changes[2].kind: must be one of goal, routine, task',
+    ])
   })
 })

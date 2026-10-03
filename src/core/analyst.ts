@@ -2,7 +2,7 @@
 // bad field rejects the whole file, with every problem listed, because
 // anything that can change a target must be exactly what Buddy expects.
 import { isTargetKey, targetDef } from './targets'
-import type { TargetKey } from './types'
+import type { PlanKind, TargetKey } from './types'
 
 export const ANALYSIS_SCHEMA_VERSION = '1'
 const LEVELS = ['observation', 'correlation', 'hypothesis', 'recommendation'] as const
@@ -24,7 +24,7 @@ export interface AnalystAdvice {
   insight_ids: string[]
 }
 
-export interface ProposedChange {
+export interface ProposedTarget {
   id: string
   type: 'target'
   target_key: TargetKey
@@ -35,6 +35,23 @@ export interface ProposedChange {
   confidence: (typeof CONFIDENCE)[number]
   review_after_days: number | null
 }
+
+/** A plan item to add: a weekly goal, a routine on weekdays, or a task on a day (null = someday). */
+export interface ProposedPlanItem {
+  id: string
+  type: 'plan_item'
+  kind: PlanKind
+  title: string
+  weekdays: number[]
+  week: 'this' | 'next' | null
+  date: string | null
+  reason: string
+  confidence: (typeof CONFIDENCE)[number]
+}
+
+export type ProposedChange = ProposedTarget | ProposedPlanItem
+
+const PLAN_KINDS = ['goal', 'routine', 'task'] as const
 
 /** A validated analysis, exactly as stored in `analyst_runs.payload`. */
 export interface Analysis {
@@ -188,13 +205,44 @@ export function validateAnalysis(doc: unknown, currency: string): ValidationResu
   /* proposed changes — the only part that can touch Buddy */
   const proposed: ProposedChange[] = []
   const seenKeys = new Set<string>()
-  c.arr(doc, 'proposed_changes', '', 20).forEach((raw, i) => {
+  let planCount = 0
+  c.arr(doc, 'proposed_changes', '', 30).forEach((raw, i) => {
     const p = `proposed_changes[${i}]`
     if (!isObj(raw)) return c.fail(p, 'must be an object')
+    if (raw.type === 'plan_item') {
+      c.keys(raw, p, ['id', 'type', 'kind', 'title', 'weekdays', 'week', 'date', 'reason', 'confidence'])
+      if (++planCount > 10) return c.fail(p, 'at most 10 plan items per analysis')
+      const id = c.str(raw, 'id', p, { max: 200 })
+      const kind = c.oneOf(raw, 'kind', p, PLAN_KINDS)
+      const title = c.str(raw, 'title', p, { max: 120 })
+      const reason = c.str(raw, 'reason', p, { max: 1000 })
+      const confidence = c.oneOf(raw, 'confidence', p, CONFIDENCE)
+      let weekdays: number[] = []
+      let week: 'this' | 'next' | null = null
+      let date: string | null = null
+      if (kind === 'routine') {
+        const w = raw.weekdays
+        if (!Array.isArray(w) || !w.length || w.some((d) => !Number.isInteger(d) || d < 0 || d > 6) || new Set(w).size !== w.length) {
+          c.fail(`${p}.weekdays`, 'a routine needs distinct weekdays 0–6 (0 = Sunday)')
+        } else weekdays = [...(w as number[])].sort()
+      } else if (raw.weekdays !== undefined && !(Array.isArray(raw.weekdays) && raw.weekdays.length === 0)) {
+        c.fail(`${p}.weekdays`, 'only routines have weekdays')
+      }
+      if (kind === 'goal') {
+        if (raw.week !== 'this' && raw.week !== 'next') c.fail(`${p}.week`, 'a goal needs week "this" or "next"')
+        else week = raw.week
+      } else if (raw.week !== undefined && raw.week !== null) c.fail(`${p}.week`, 'only goals have a week')
+      if (kind === 'task' && raw.date !== undefined && raw.date !== null) {
+        if (typeof raw.date !== 'string' || !validDate(raw.date)) c.fail(`${p}.date`, 'must be a date YYYY-MM-DD or null (someday)')
+        else date = raw.date
+      } else if (kind !== 'task' && raw.date !== undefined && raw.date !== null) c.fail(`${p}.date`, 'only tasks have a date')
+      if (id && kind && title && reason && confidence) proposed.push({ id, type: 'plan_item', kind, title, weekdays, week, date, reason, confidence })
+      return
+    }
     c.keys(raw, p, ['id', 'type', 'target_key', 'current_value', 'suggested_value', 'unit', 'reason', 'confidence', 'review_after_days'])
     const id = c.str(raw, 'id', p, { max: 200 })
     if (raw.type !== 'target') {
-      c.fail(`${p}.type`, `"${String(raw.type)}" is not supported (only "target")`)
+      c.fail(`${p}.type`, `"${String(raw.type)}" is not supported (only "target" or "plan_item")`)
       return
     }
     const key = raw.target_key

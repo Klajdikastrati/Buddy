@@ -24,7 +24,8 @@ browser at 390×844 with test data). Nothing has run against the real database y
 ### Waiting on the user
 - Supabase: paste `supabase/migrations/20261003150000_full_app.sql` into the SQL Editor — **checked 2026-10-03:
   still current** (no type/sync changes since it was written; 2026-10-03 later: `foods.source` now also allows
-  `'generic'` — edited in place since the file was never applied). Until it's applied, every push fails (new tables
+  `'generic'`, and `recommendations` gained `details` jsonb + nullable target columns for plan proposals — edited
+  in place since the file was never applied). Until it's applied, every push fails (new tables
   and entry kinds don't exist on the server), so local logging works but nothing syncs.
 - Supabase: create the login user (Auth → Users → Add user, auto-confirm), turn off "Allow new users to sign up".
 - Deploy: not decided (any static host; needs HTTPS for the PWA and the camera). GitHub push to

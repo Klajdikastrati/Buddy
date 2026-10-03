@@ -251,11 +251,12 @@ create table public.recommendations (
   id uuid primary key,
   user_id uuid not null default auth.uid() references auth.users on delete cascade,
   run_id uuid not null references public.analyst_runs on delete cascade,
-  type text not null,
-  target_key text not null,
+  type text not null check (type in ('target', 'plan_item')),
+  target_key text,
   current_value numeric(14, 2),
-  suggested_value numeric(14, 2) not null,
-  unit text not null,
+  suggested_value numeric(14, 2),
+  unit text,
+  details jsonb,                              -- plan_item: {kind, title, weekdays, week, date}
   reason text not null,
   confidence text not null check (confidence in ('low', 'medium', 'high')),
   status text not null default 'pending' check (status in ('pending', 'accepted', 'rejected', 'stale')),
@@ -263,7 +264,11 @@ create table public.recommendations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz,
-  server_updated_at timestamptz not null default now()
+  server_updated_at timestamptz not null default now(),
+  check (
+    (type = 'target' and target_key is not null and suggested_value is not null and unit is not null)
+    or (type = 'plan_item' and details is not null)
+  )
 );
 create index recommendations_sync_idx on public.recommendations (user_id, server_updated_at);
 create index recommendations_run_idx on public.recommendations (run_id);

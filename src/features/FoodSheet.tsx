@@ -42,9 +42,9 @@ const kcalPer100 = (f: Food) => {
   return `${f.kcal == null ? '? kcal' : `${formatNumber(f.kcal, 0)} kcal`} · P ${m(f.proteinG)} C ${m(f.carbsG)} F ${m(f.fatG)} / 100 ${unitOf(f)}`
 }
 
-export function FoodSheet({ entry, food, query }: { entry?: Entry; food?: Food; query?: string }) {
+export function FoodSheet({ entry, food, draft, query }: { entry?: Entry; food?: Food; draft?: FoodDraft; query?: string }) {
   // New logs open synchronously, so the search field's focus lands inside the tap (iOS keyboard).
-  if (!entry) return <FoodFlow initial={food ? { food, saved: true } : null} query={query} />
+  if (!entry) return <FoodFlow initial={food ? { food, saved: true } : draft ? { food: draftFood(draft), saved: false } : null} query={query} />
   return <EditFood entry={entry} />
 }
 
@@ -414,7 +414,7 @@ function AmountForm({ entry, picked, defaults, onChange }: { entry?: Entry; pick
           <IconChip name={food.source === 'recipe' ? 'book' : 'food'} tint={DOMAIN.food.tint} />
           <div className="grow">
             <p className="picked-name">{food.name}</p>
-            <p className="row-sub">{[food.brand, kcalPer100(food), picked.saved ? null : 'Open Food Facts'].filter(Boolean).join(' · ')}</p>
+            <p className="row-sub">{[food.brand, kcalPer100(food), food.source === 'off' ? 'Open Food Facts' : food.source === 'generic' ? 'Common food' : null].filter(Boolean).join(' · ')}</p>
           </div>
           <button type="button" className="btn-text" onClick={onChange}>
             Change

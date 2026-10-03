@@ -263,13 +263,26 @@ export interface AnalystRun extends Synced {
   payload: unknown
 }
 
+/** A plan item the Analyst suggests adding (goal for this/next week, routine on weekdays, task on a day). */
+export interface PlanProposal {
+  kind: PlanKind
+  title: string
+  weekdays: number[]
+  week: 'this' | 'next' | null
+  date: LocalDate | null
+}
+
+/** One proposed change from an imported analysis: a target value, or a plan item to add. */
 export interface Recommendation extends Synced {
   runId: ID
-  type: string
-  targetKey: TargetKey
+  type: 'target' | 'plan_item'
+  /** type 'target' only. */
+  targetKey: TargetKey | null
   currentValue: number | null
-  suggestedValue: number
-  unit: string
+  suggestedValue: number | null
+  unit: string | null
+  /** type 'plan_item' only. */
+  details: PlanProposal | null
   reason: string
   confidence: 'low' | 'medium' | 'high'
   status: 'pending' | 'accepted' | 'rejected' | 'stale'

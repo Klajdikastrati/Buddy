@@ -224,9 +224,16 @@ export function buildExport(input: ExportInput) {
     analysis_contract: {
       file: 'buddy-analysis.json',
       schema_version: '1',
-      proposed_change_types: ['target'],
+      proposed_change_types: ['target', 'plan_item'],
       target_keys: bounds,
       rule: 'current_value must equal targets.current[key].value (or null if unset); proposals outside bounds are rejected',
+      plan_item: {
+        fields: 'id, type:"plan_item", kind: goal|routine|task, title (≤120 chars), reason, confidence: low|medium|high',
+        goal: 'week: "this" | "next"',
+        routine: 'weekdays: [0..6], 0 = Sunday, at least one',
+        task: 'date: "YYYY-MM-DD" or null (someday)',
+        limit: 'at most 10 plan items per analysis; each is added only if the user taps "Add to plan"',
+      },
     },
   }
 }
