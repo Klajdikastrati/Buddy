@@ -34,6 +34,9 @@ available, so the app looks the same on a Windows/Android browser as on the iPho
   (often overloaded → 503 without CORS headers → retried 3×, then "search failed" with create/scan fallbacks).
   `search.openfoodfacts.org` sends no CORS headers, so it can't be used from the browser. Called only on an explicit
   search/scan; a result is stored as a food only when logged. Mapping + sanity bounds in `core/off.ts`.
+- **Built-in common foods** (`core/foodbase.ts`, ~140 items, USDA reference values per 100 g/ml; Albanian dishes
+  are flagged estimates; English + Albanian names, accents optional). Searched offline before anything online —
+  OFF text search is unreliable and weak on unpackaged food. Saved to My foods (source `generic`) when first logged.
 
 ## Data flow
 1. Screen reads Dexie via `useLiveQuery` (re-renders on any local change).

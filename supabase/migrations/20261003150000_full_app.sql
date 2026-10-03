@@ -32,7 +32,7 @@ create table public.foods (
   caffeine_mg numeric(10, 2),
   servings jsonb not null default '[]',      -- [{label, grams}]
   ingredients jsonb,                          -- recipes: [{foodId, grams}]
-  source text not null default 'custom' check (source in ('custom', 'off', 'recipe')),
+  source text not null default 'custom' check (source in ('custom', 'off', 'recipe', 'generic')),
   source_id text,
   favorite boolean not null default false,
   use_count integer not null default 0,

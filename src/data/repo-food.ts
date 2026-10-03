@@ -121,9 +121,7 @@ export async function logFoodItem(item: Item): Promise<ID> {
 export async function adoptFood(draft: FoodDraft): Promise<Food> {
   if (draft.sourceId) {
     const existing = await db.foods
-      .where('barcode')
-      .equals(draft.sourceId)
-      .filter((f) => !f.deletedAt)
+      .filter((f) => !f.deletedAt && (f.sourceId === draft.sourceId || (!!draft.barcode && f.barcode === draft.barcode)))
       .first()
     if (existing) return existing.archived ? updateFood(existing, { archived: false }) : existing
   }

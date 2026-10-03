@@ -6,6 +6,7 @@ import { formatNumber, parseDecimal } from '../core/numbers'
 import { rankItems } from '../core/recents'
 import type { Entry, Food, ID, Item } from '../core/types'
 import { db } from '../data/db'
+import { searchBase } from '../core/foodbase'
 import { offProduct, offSearch } from '../data/off'
 import { adoptFood, foodByBarcode, logFood } from '../data/repo-food'
 import { DOMAIN } from '../ui/domains'
@@ -35,7 +36,11 @@ const toDraft = ({ name, brand, barcode, basis, servings, ingredients, source, s
   return { name, brand, barcode, basis, servings, ingredients, source, sourceId, kcal, proteinG, carbsG, fatG, fiberG, sugarG, satFatG, sodiumMg, caffeineMg }
 }
 
-const kcalPer100 = (f: Food) => (f.kcal == null ? 'kcal unknown' : `${formatNumber(f.kcal, 0)} kcal / 100 ${unitOf(f)}`)
+/** "89 kcal · P 1.1 C 23 F 0.3 per 100 g" — macros shown wherever a food is picked. */
+const kcalPer100 = (f: Food) => {
+  const m = (v: number | null) => (v == null ? '?' : formatNumber(v, 1))
+  return `${f.kcal == null ? '? kcal' : `${formatNumber(f.kcal, 0)} kcal`} · P ${m(f.proteinG)} C ${m(f.carbsG)} F ${m(f.fatG)} / 100 ${unitOf(f)}`
+}
 
 export function FoodSheet({ entry, food, query }: { entry?: Entry; food?: Food; query?: string }) {
   // New logs open synchronously, so the search field's focus lands inside the tap (iOS keyboard).
@@ -107,6 +112,12 @@ function FoodPicker({ initialQuery, onPick }: { initialQuery: string; onPick: (f
     [query, foodItems, byId, now],
   )
   const matches = useMemo(() => (foods && query ? searchFoods(foods, query, now) : []), [foods, query, now])
+  // Built-in common foods, minus any already saved to My foods.
+  const common = useMemo(() => {
+    if (!query) return []
+    const saved = new Set(foods?.filter((f) => !f.deletedAt && f.sourceId).map((f) => f.sourceId))
+    return searchBase(query).filter((b) => !saved.has(b.draft.sourceId))
+  }, [foods, query])
 
   async function searchOnline() {
     setOnline({ state: 'loading' })
@@ -204,8 +215,20 @@ function FoodPicker({ initialQuery, onPick }: { initialQuery: string; onPick: (f
               ))}
             </ul>
           ) : (
-            <p className="muted pad-l">No saved food matches “{query}”.</p>
+            <p className="muted pad-l">{common.length ? 'None saved yet — pick a common food below.' : `No saved food matches “${query}”.`}</p>
           )}
+        </section>
+      )}
+
+      {common.length > 0 && (
+        <section>
+          <h3 className="section-label">Common foods</h3>
+          <ul className="list with-icons">
+            {common.map((b) => {
+              const f = draftFood(b.draft)
+              return <FoodRow key={b.id} food={f} sub={[kcalPer100(f), b.estimate ? 'typical values' : null].filter(Boolean).join(' · ')} onClick={() => onPick(f, false)} />
+            })}
+          </ul>
         </section>
       )}
 
@@ -230,10 +253,12 @@ function FoodPicker({ initialQuery, onPick }: { initialQuery: string; onPick: (f
           {online.state !== 'done' && (
             <button type="button" className="btn btn-quiet full" disabled={online.state === 'loading'} onClick={() => void searchOnline()}>
               <Icon name="search" size={18} />
-              {online.state === 'loading' ? 'Searching Open Food Facts…' : 'Search Open Food Facts'}
+              {online.state === 'loading' ? 'Searching packaged products…' : 'Search packaged products online'}
             </button>
           )}
-          {online.state === 'error' && <p className="field-error">Online search failed. Try again, scan, or create it.</p>}
+          {online.state === 'error' && (
+            <p className="field-hint">Open Food Facts’ search isn’t responding right now (it’s often overloaded). Scanning the barcode still works.</p>
+          )}
           <button type="button" className="btn btn-quiet full" onClick={() => create({ name: query })}>
             <Icon name="plus" size={18} />
             Create “{query}”

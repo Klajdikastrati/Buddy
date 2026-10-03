@@ -11,7 +11,7 @@ import { navigate } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
 import { openSheet } from '../ui/sheets'
 
-const SOURCE: Record<Food['source'], string | null> = { custom: null, off: 'Open Food Facts', recipe: 'Recipe' }
+const SOURCE: Record<Food['source'], string | null> = { custom: null, off: 'Open Food Facts', recipe: 'Recipe', generic: 'Common food' }
 
 /** The food library: custom foods, recipes, and anything kept from Open Food Facts. */
 export function MeFoods() {

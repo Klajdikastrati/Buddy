@@ -150,7 +150,7 @@ export interface Food extends Synced, Nutrients {
   basis: '100g' | '100ml'
   servings: Serving[]
   ingredients: { foodId: ID; grams: number }[] | null
-  source: 'custom' | 'off' | 'recipe'
+  source: 'custom' | 'off' | 'recipe' | 'generic'
   sourceId: string | null
   favorite: boolean
   useCount: number

@@ -143,3 +143,19 @@ describe('food search and day totals', () => {
     expect(day.entries).toHaveLength(2)
   })
 })
+
+describe('built-in common foods', () => {
+  it('finds foods by English or Albanian name, accents optional', async () => {
+    const { searchBase } = await import('./foodbase')
+    expect(searchBase('banana')[0].draft.name).toBe('Banana')
+    expect(searchBase('banane')[0].draft.name).toBe('Banana')
+    expect(searchBase('molle')[0].draft.name).toBe('Apple')
+    expect(searchBase('kos').map((b) => b.draft.name)).toContain('Yogurt (plain)')
+    expect(searchBase('byrek').length).toBe(3)
+    const banana = searchBase('banana')[0].draft
+    expect(banana).toMatchObject({ kcal: 89, basis: '100g', source: 'generic', sourceId: 'gen:banana' })
+    expect(banana.servings[0]).toEqual({ label: '1 medium (118 g)', grams: 118 })
+    expect(searchBase('espresso')[0].draft).toMatchObject({ basis: '100ml', caffeineMg: 212 })
+    expect(searchBase('')).toEqual([])
+  })
+})

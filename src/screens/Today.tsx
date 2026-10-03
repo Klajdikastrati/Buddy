@@ -162,7 +162,7 @@ function CaloriesTile({ entries, today, targets }: { entries: Entry[]; today: Lo
   const proteinTarget = targetOn(targets, 'protein_daily', today)
   const parts = [
     d.count === 0 ? 'Nothing logged' : target == null ? null : kcal <= target ? `${formatNumber(target - kcal, 0)} left` : `${formatNumber(kcal - target, 0)} over`,
-    protein != null ? `P ${formatNumber(protein, 0)}${proteinTarget != null ? `/${formatNumber(proteinTarget, 0)}` : ''} g` : null,
+    d.count ? `P ${formatNumber(protein ?? 0, 0)}${proteinTarget != null ? `/${formatNumber(proteinTarget, 0)}` : ''} · C ${formatNumber(d.totals.carbsG ?? 0, 0)} · F ${formatNumber(d.totals.fatG ?? 0, 0)} g` : null,
   ]
   return (
     <Tile

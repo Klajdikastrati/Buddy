@@ -82,7 +82,7 @@ describe('formatting', () => {
       nutrition: { foodId: null, grams: 250, servingLabel: '1 can', kcal: null, proteinG: null, carbsG: null, fatG: null, fiberG: null, sugarG: null, satFatG: null, sodiumMg: null, caffeineMg: null },
       money: { direction: 'out', amount: 180, currency: 'ALL', categoryId: null },
     })
-    expect(entryLine(food, tz)).toEqual({ detail: ['1 can', '180 Lek'], side: 'kcal ?', positive: false })
+    expect(entryLine(food, tz)).toEqual({ detail: ['1 can', 'P ? C ? F ?', '180 Lek'], side: 'kcal ?', positive: false })
     expect(entryLine(weight('2026-10-03', 72.4), tz).side).toBe('72.4 kg')
   })
 })

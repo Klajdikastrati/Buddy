@@ -22,6 +22,8 @@ export function entryLine(e: Entry, timeZone: string, tracker?: TrackerDef): Ent
     const n = e.nutrition
     if (n.servingLabel) detail.push(n.servingLabel)
     else if (n.grams != null) detail.push(`${num(n.grams, 0)} g`)
+    const g = (v: number | null) => (v == null ? '?' : num(v, 0))
+    detail.push(`P ${g(n.proteinG)} C ${g(n.carbsG)} F ${g(n.fatG)}`)
     side = n.kcal == null ? 'kcal ?' : `${num(n.kcal, 0)} kcal`
     if (e.money) detail.push(formatMoney(e.money.amount, e.money.currency))
   } else if (e.money) {
