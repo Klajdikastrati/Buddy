@@ -33,3 +33,12 @@ Every synced row: client UUID (or date key), `createdAt`, `updatedAt` (LWW), `de
 Server adds `user_id` (default `auth.uid()`, RLS) and `server_updated_at` (pull cursor, set by trigger;
 stale writes ignored). JSONB only where data is genuinely variable (servings, template exercises, tracker
 fields/values, analyst payload).
+
+## Analyst contracts (JSON files, never database access)
+- **Out — `buddy-export-v1-<date>.json`** (`core/export.ts`, Me → Export for Analyst, 30/90/365 days): profile,
+  `conventions` (null = not logged), targets (current at period end + history + `proposal_bounds`),
+  `interventions` (applied Analyst changes), `daily` (one row per day from `core/series.ts`), entries, foods used,
+  workouts with sets, exercises, check-ins, trackers, `data_quality` (missing days, unknown nutrients), `signals`
+  (Pearson r, n, 95% CI, ready flag), `analysis_contract` (what an importable analysis may contain).
+- **In — `buddy-analysis.json`** (schema_version "1", `core/analyst.ts`): validated strictly; only `target`
+  proposals for allow-listed keys within bounds; stored as `analyst_runs` + `recommendations`.

@@ -45,7 +45,8 @@ export interface SeriesInput {
   moneySince: LocalDate | null
 }
 
-const add = (a: number | null, b: number | null | undefined) => (b == null ? a : (a ?? 0) + b)
+/** Null-aware sum, rounded to 2 decimals so 3.1 + 4.2 doesn't export as 7.300000000000001. */
+const add = (a: number | null, b: number | null | undefined) => (b == null ? a : Math.round(((a ?? 0) + b) * 100) / 100)
 
 export function dailySeries({ entries, sets, checkins, trackers = [], from, to, moneySince }: SeriesInput): DayRow[] {
   const live = entries.filter((e) => !e.deletedAt && e.localDate >= from && e.localDate <= to)
@@ -99,8 +100,8 @@ export function dailySeries({ entries, sets, checkins, trackers = [], from, to, 
     let qualitySum = 0
     for (const e of [...day].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) {
       if (e.money) {
-        if (e.money.direction === 'out') row.spend = (row.spend ?? 0) + e.money.amount
-        else row.income = (row.income ?? 0) + e.money.amount
+        if (e.money.direction === 'out') row.spend = add(row.spend, e.money.amount)
+        else row.income = add(row.income, e.money.amount)
       }
       if (e.sleep) {
         row.sleepMin = add(row.sleepMin, e.sleep.durationMin)

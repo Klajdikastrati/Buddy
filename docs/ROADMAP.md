@@ -50,7 +50,7 @@ Decided 2026-10-03 by the user: build everything now instead of phase-by-phase u
    series (sleep→energy/mood same day, caffeine→sleep next night, workout→mood, spend↔mood, weekday vs weekend),
    only when n ≥ 14, always labelled "association, not cause" with n. Custom trackers: define in Me (fields
    number/text/bool + unit), log from Quick Add, show in History.
-7. **Analyst export** — Me → Export for Analyst (30/90/365 days) → one `buddy-export-v1.json`: profile, targets
+7. ~~**Analyst export**~~ — done (share sheet or download; contract in DATA_MODEL.md). Spec: Me → Export for Analyst (30/90/365 days) → one `buddy-export-v1.json`: profile, targets
    + history, daily series, entries, foods used, workouts+sets, check-ins, data quality (missing days,
    unknown nutrients), signals. Pure builder in `src/core/export.ts` with tests.
 8. **Analyst import** — Me → Analyst: pick `buddy-analysis.json`, validate strictly (`src/core/analyst.ts`),

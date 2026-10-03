@@ -8,7 +8,9 @@ import { signOut, syncNow, type SyncState } from '../data/sync'
 import { DOMAIN } from '../ui/domains'
 import { NavRow } from '../ui/fields'
 import { navigate, useSettings, useSyncState, useToday } from '../ui/hooks'
+import { downloadFile } from '../ui/download'
 import { IconChip } from '../ui/icons'
+import { openSheet } from '../ui/sheets'
 import { toast } from '../ui/toast'
 
 function syncLabel(s: SyncState, pending: number): string {
@@ -45,10 +47,7 @@ export function Me() {
     const tables = ['entries', 'items', 'categories', 'targets', 'foods', 'exercises', 'templates', 'sets', 'checkins', 'plan', 'trackers', 'analystRuns', 'recommendations'] as const
     const data: Record<string, unknown> = { exportedAt: new Date().toISOString(), settings }
     for (const t of tables) data[t] = await db.table(t).toArray()
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
-    const a = Object.assign(document.createElement('a'), { href: url, download: `buddy-backup-${today}.json` })
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadFile(new File([JSON.stringify(data, null, 2)], `buddy-backup-${today}.json`, { type: 'application/json' }))
   }
 
   const sortedItems = [...(items ?? [])].sort((a, b) => Number(a.archived) - Number(b.archived) || b.useCount - a.useCount)
@@ -64,6 +63,15 @@ export function Me() {
         <NavRow icon="food" tint={DOMAIN.food.tint} label="Foods & recipes" trail={foodCount ? `${foodCount}` : undefined} onClick={() => navigate('/me/foods')} />
         <NavRow icon="workout" tint={DOMAIN.workout.tint} label="Training" trail="Templates & exercises" onClick={() => navigate('/me/training')} />
         <NavRow icon="tracker" tint={DOMAIN.tracker.tint} label="Custom trackers" trail={trackerCount ? `${trackerCount}` : undefined} onClick={() => navigate('/me/trackers')} />
+      </section>
+
+      <section className="group" aria-labelledby="analyst-set">
+        <h2 id="analyst-set" className="section-label">
+          Buddy Analyst
+        </h2>
+        <div className="settings-group with-icons">
+          <NavRow icon="upload" tint={DOMAIN.analyst.tint} label="Export for Analyst" onClick={() => openSheet({ kind: 'analyst-export' })} />
+        </div>
       </section>
 
       <section className="group" aria-labelledby="cat-set">

@@ -23,6 +23,7 @@ export type SheetState =
   | { kind: 'plan-item'; item?: PlanItem; planKind?: PlanKind }
   | { kind: 'tracker-def'; def?: TrackerDef }
   | { kind: 'tracker-log'; trackerId: ID; entry?: Entry }
+  | { kind: 'analyst-export' }
 
 let state: SheetState = { kind: 'none' }
 const listeners = new Set<() => void>()

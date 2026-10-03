@@ -101,3 +101,17 @@ describe('signal wording', () => {
     expect(describeSignal({ ...base, n: 5, r: 0.9, strength: 'strong', ready: false })).toBe('Sleep ↔ energy the same day: 5 of 14 days so far')
   })
 })
+
+describe('series rounding', () => {
+  it('sums distances without float noise', () => {
+    const rows = dailySeries({
+      entries: [3.1, 4.2].map((km) => entry('2026-10-03', { kind: 'activity', activity: { type: 'walk', durationMin: null, distanceKm: km, steps: null } })),
+      sets: [],
+      checkins: [],
+      from: '2026-10-03',
+      to: '2026-10-03',
+      moneySince: null,
+    })
+    expect(rows[0].km).toBe(7.3)
+  })
+})

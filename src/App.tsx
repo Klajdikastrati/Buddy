@@ -13,6 +13,7 @@ import { PlanItemSheet } from './features/PlanItemSheet'
 import { MoneySheet } from './features/MoneySheet'
 import { QuickAddSheet } from './features/QuickAddSheet'
 import { ExerciseSheet } from './features/ExerciseSheet'
+import { ExportSheet } from './features/ExportSheet'
 import { RecipeSheet } from './features/RecipeSheet'
 import { TemplateSheet } from './features/TemplateSheet'
 import { TrackerDefSheet, TrackerLogSheet } from './features/TrackerSheets'
@@ -149,6 +150,7 @@ function Shell({ userId }: { userId: string }) {
       {sheet.kind === 'plan-item' && <PlanItemSheet key={sheet.item?.id ?? 'new'} item={sheet.item} planKind={sheet.planKind} />}
       {sheet.kind === 'tracker-def' && <TrackerDefSheet key={sheet.def?.id ?? 'new'} def={sheet.def} />}
       {sheet.kind === 'tracker-log' && <TrackerLogSheet key={sheet.entry?.id ?? sheet.trackerId} trackerId={sheet.trackerId} entry={sheet.entry} />}
+      {sheet.kind === 'analyst-export' && <ExportSheet />}
       <Toaster />
     </>
   )
