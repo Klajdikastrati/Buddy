@@ -42,6 +42,8 @@ export function Today() {
   const plan = useLiveQuery(() => db.plan.toArray(), [])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
   const catName = useMemo(() => new Map(categories?.map((c) => [c.id, c.name])), [categories])
+  const trackers = useLiveQuery(() => db.trackers.toArray(), [])
+  const trackerById = useMemo(() => new Map(trackers?.map((t) => [t.id, t])), [trackers])
 
   if (!entries || firstDay === undefined || !targets || !weights || checkin === undefined || !templates || activeWorkout === undefined || !plan)
     return null
@@ -99,6 +101,7 @@ export function Today() {
                 key={e.id}
                 entry={e}
                 timeZone={settings.timezone}
+                tracker={e.custom ? trackerById.get(e.custom.trackerId) : undefined}
                 categoryName={e.money && !e.nutrition && e.money.categoryId ? catName.get(e.money.categoryId) : undefined}
               />
             ))}
