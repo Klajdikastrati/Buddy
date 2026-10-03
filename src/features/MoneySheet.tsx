@@ -4,7 +4,7 @@ import { formatMoney, parseAmount } from '../core/money'
 import { searchItems } from '../core/recents'
 import type { Entry, EntryKind, ID, Item } from '../core/types'
 import { db } from '../data/db'
-import { logMoney, setEntryDeleted } from '../data/repo'
+import { logMoney, setEntryDeleted, type MoneyKind } from '../data/repo'
 import { useSettings } from '../ui/hooks'
 import { closeSheet } from '../ui/sheets'
 import { Sheet } from '../ui/Sheet'
@@ -25,7 +25,9 @@ function toLocalInput(iso: string): string {
 export function MoneySheet({ entry, prefill }: Props) {
   const settings = useSettings()
   const editing = !!entry
-  const [kind, setKind] = useState<EntryKind>(entry?.kind ?? prefill?.kind ?? 'expense')
+  const [kind, setKind] = useState<MoneyKind>(
+    (entry?.kind ?? prefill?.kind) === 'income' ? 'income' : 'expense',
+  )
   const [amount, setAmount] = useState(entry?.money ? String(entry.money.amount) : '')
   const [title, setTitle] = useState(entry?.title ?? prefill?.title ?? '')
   const [categoryId, setCategoryId] = useState<ID | null>(entry?.money?.categoryId ?? null)

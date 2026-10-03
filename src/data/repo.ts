@@ -63,8 +63,10 @@ export async function ensureDefaults() {
   navigator.storage?.persist?.().catch(() => {})
 }
 
+export type MoneyKind = Extract<EntryKind, 'expense' | 'income'>
+
 export interface MoneyInput {
-  kind: EntryKind
+  kind: MoneyKind
   title: string
   amount: number
   categoryId: ID | null
@@ -146,8 +148,9 @@ export async function logMoney(input: MoneyInput, editId?: ID): Promise<ID> {
 
 /** One-tap repeat of an item with its remembered values, at the current time. */
 export async function logItem(item: Item): Promise<ID> {
+  // TODO(phase 3): food items log a nutrition facet (+ money if priced) instead.
   return logMoney({
-    kind: item.kind,
+    kind: item.kind === 'income' ? 'income' : 'expense',
     title: item.name,
     amount: item.money?.amount ?? 0,
     categoryId: item.money?.categoryId ?? null,
@@ -198,6 +201,7 @@ export async function setTarget(key: TargetKey, value: number | null, unit: stri
       unit,
       effectiveFrom: from,
       source: 'user',
+      recommendationId: null,
       createdAt: sameDay?.createdAt ?? t,
       updatedAt: t,
       deletedAt: value == null ? t : null,

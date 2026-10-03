@@ -1,152 +1,182 @@
 // Mapping between the local shape (facets embedded, camelCase) and the server
 // tables (facet tables, snake_case). Pure — shared by any client.
-import type { Category, Entry, Item, Settings, Target } from './types'
+import type {
+  AnalystRun,
+  Category,
+  DayCheckin,
+  Entry,
+  Exercise,
+  Food,
+  Item,
+  PlanItem,
+  Recommendation,
+  Settings,
+  Target,
+  TrackerDef,
+  WorkoutSet,
+  WorkoutTemplate,
+} from './types'
 
-type Row = Record<string, unknown>
+export type Row = Record<string, unknown>
 
-export function entryToServer(e: Entry): { entry: Row; money: Row | null } {
-  return {
-    entry: {
-      id: e.id,
-      kind: e.kind,
-      occurred_at: e.occurredAt,
-      local_date: e.localDate,
-      item_id: e.itemId,
-      title: e.title,
-      note: e.note,
-      created_at: e.createdAt,
-      updated_at: e.updatedAt,
-      deleted_at: e.deletedAt,
-    },
-    money: e.money
-      ? {
-          entry_id: e.id,
-          direction: e.money.direction,
-          amount: e.money.amount,
-          currency: e.money.currency,
-          category_id: e.money.categoryId,
-          updated_at: e.updatedAt,
-        }
-      : null,
+const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
+const camel = (k: string) => k.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase())
+
+/** Postgres returns `+00:00` offsets and microseconds; normalise to JS ISO. */
+function iso(v: unknown): string {
+  return new Date(v as string).toISOString()
+}
+
+/** camelCase object → snake_case row. */
+export function toRow(obj: object, omit: string[] = []): Row {
+  const out: Row = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (omit.includes(k) || v === undefined) continue
+    out[snake(k)] = v
   }
+  return out
+}
+
+/** snake_case row → camelCase object. Timestamps (`…At`) normalised, listed numerics coerced. */
+export function fromRow<T>(row: Row, numeric: readonly string[] = []): T {
+  const out: Row = {}
+  for (const [k, v] of Object.entries(row)) {
+    if (k === 'user_id' || k === 'server_updated_at') continue
+    const key = camel(k)
+    if (v != null && key.endsWith('At') && typeof v === 'string') out[key] = iso(v)
+    else if (v != null && numeric.includes(key)) out[key] = Number(v)
+    else out[key] = v
+  }
+  return out as T
+}
+
+const NUTRIENTS = ['kcal', 'proteinG', 'carbsG', 'fatG', 'fiberG', 'sugarG', 'satFatG', 'sodiumMg', 'caffeineMg']
+
+/* ---------------------------------- entries --------------------------------- */
+
+/** Facet table → local property. Order matters only for readability. */
+export const FACETS = {
+  entry_money: 'money',
+  entry_nutrition: 'nutrition',
+  entry_sleep: 'sleep',
+  entry_measurement: 'measurement',
+  entry_activity: 'activity',
+  entry_workout: 'workout',
+  entry_custom: 'custom',
+} as const satisfies Record<string, keyof Entry>
+
+export type FacetTable = keyof typeof FACETS
+
+const FACET_NUMERIC: Record<FacetTable, string[]> = {
+  entry_money: ['amount'],
+  entry_nutrition: ['grams', ...NUTRIENTS],
+  entry_sleep: ['durationMin', 'quality'],
+  entry_measurement: ['value'],
+  entry_activity: ['durationMin', 'distanceKm', 'steps'],
+  entry_workout: [],
+  entry_custom: [],
+}
+
+export function entryToServer(e: Entry): { entry: Row; facets: Record<FacetTable, Row | null> } {
+  const facetKeys = Object.values(FACETS) as string[]
+  const facets = {} as Record<FacetTable, Row | null>
+  for (const [table, prop] of Object.entries(FACETS) as [FacetTable, keyof Entry][]) {
+    const f = e[prop] as object | undefined
+    facets[table] = f ? { entry_id: e.id, ...toRow(f), updated_at: e.updatedAt } : null
+  }
+  return { entry: toRow(e, facetKeys), facets }
 }
 
 export function entryFromServer(r: Row): Entry {
-  const m = r.entry_money as Row | null | undefined
-  return {
-    id: r.id as string,
-    kind: r.kind as Entry['kind'],
-    occurredAt: iso(r.occurred_at),
-    localDate: r.local_date as string,
-    itemId: (r.item_id as string | null) ?? null,
-    title: r.title as string,
-    note: (r.note as string | null) ?? null,
-    money: m
-      ? {
-          direction: m.direction as 'in' | 'out',
-          amount: Number(m.amount),
-          currency: (m.currency as string).trim(),
-          categoryId: (m.category_id as string | null) ?? null,
-        }
-      : undefined,
-    createdAt: iso(r.created_at),
-    updatedAt: iso(r.updated_at),
-    deletedAt: r.deleted_at ? iso(r.deleted_at) : null,
+  const base: Row = {}
+  for (const [k, v] of Object.entries(r)) if (!(k in FACETS)) base[k] = v
+  const entry = fromRow<Entry>(base)
+  for (const [table, prop] of Object.entries(FACETS) as [FacetTable, keyof Entry][]) {
+    const raw = r[table]
+    const f = (Array.isArray(raw) ? raw[0] : raw) as Row | null | undefined
+    if (!f) continue
+    const { entryId: _e, updatedAt: _u, ...facet } = fromRow<Row>(f, FACET_NUMERIC[table])
+    if (table === 'entry_money') facet.currency = String(facet.currency).trim()
+    ;(entry as unknown as Row)[prop] = facet
   }
+  return entry
 }
+
+/** PostgREST select that embeds every facet. */
+export const ENTRY_SELECT = `*, ${Object.keys(FACETS)
+  .map((t) => `${t}(*)`)
+  .join(', ')}`
+
+/* ----------------------------------- items ---------------------------------- */
 
 export function itemToServer(i: Item): Row {
   return {
-    id: i.id,
-    name: i.name,
-    kind: i.kind,
+    ...toRow(i, ['money', 'food']),
     default_amount: i.money?.amount ?? null,
     currency: i.money?.currency ?? null,
     category_id: i.money?.categoryId ?? null,
-    use_count: i.useCount,
-    last_used_at: i.lastUsedAt,
-    favorite: i.favorite,
-    archived: i.archived,
-    created_at: i.createdAt,
-    updated_at: i.updatedAt,
-    deleted_at: i.deletedAt,
+    food_id: i.food?.foodId ?? null,
+    food_grams: i.food?.grams ?? null,
+    food_serving_label: i.food?.servingLabel ?? null,
   }
 }
 
 export function itemFromServer(r: Row): Item {
-  return {
-    id: r.id as string,
-    name: r.name as string,
-    kind: r.kind as Item['kind'],
-    money:
-      r.default_amount == null
-        ? undefined
-        : {
-            amount: Number(r.default_amount),
-            currency: String(r.currency ?? 'ALL').trim(),
-            categoryId: (r.category_id as string | null) ?? null,
-          },
-    useCount: Number(r.use_count),
-    lastUsedAt: r.last_used_at ? iso(r.last_used_at) : null,
-    favorite: Boolean(r.favorite),
-    archived: Boolean(r.archived),
-    createdAt: iso(r.created_at),
-    updatedAt: iso(r.updated_at),
-    deletedAt: r.deleted_at ? iso(r.deleted_at) : null,
+  const { defaultAmount, currency, categoryId, foodId, foodGrams, foodServingLabel, ...rest } = fromRow<Row>(r, [
+    'defaultAmount',
+    'foodGrams',
+    'useCount',
+  ])
+  const item = rest as unknown as Item
+  if (defaultAmount != null) {
+    item.money = {
+      amount: defaultAmount as number,
+      currency: String(currency ?? 'ALL').trim(),
+      categoryId: (categoryId as string | null) ?? null,
+    }
   }
+  if (foodId) {
+    item.food = {
+      foodId: foodId as string,
+      grams: (foodGrams as number | null) ?? 100,
+      servingLabel: (foodServingLabel as string | null) ?? null,
+    }
+  }
+  return item
 }
 
-export function categoryToServer(c: Category): Row {
-  return {
-    id: c.id,
-    name: c.name,
-    sort_order: c.sortOrder,
-    archived: c.archived,
-    created_at: c.createdAt,
-    updated_at: c.updatedAt,
-    deleted_at: c.deletedAt,
-  }
+/* --------------------------- simple tables (flat) --------------------------- */
+
+export interface TableSpec<T> {
+  server: string
+  onConflict: string
+  toServer: (row: T) => Row
+  fromServer: (row: Row) => T
 }
 
-export function categoryFromServer(r: Row): Category {
-  return {
-    id: r.id as string,
-    name: r.name as string,
-    sortOrder: Number(r.sort_order),
-    archived: Boolean(r.archived),
-    createdAt: iso(r.created_at),
-    updatedAt: iso(r.updated_at),
-    deletedAt: r.deleted_at ? iso(r.deleted_at) : null,
-  }
+const flat = <T extends object>(server: string, numeric: string[] = [], onConflict = 'id'): TableSpec<T> => ({
+  server,
+  onConflict,
+  toServer: (row) => toRow(row),
+  fromServer: (row) => fromRow<T>(row, numeric),
+})
+
+export const SPECS = {
+  categories: flat<Category>('categories', ['sortOrder']),
+  foods: flat<Food>('foods', [...NUTRIENTS, 'useCount']),
+  exercises: flat<Exercise>('exercises'),
+  templates: flat<WorkoutTemplate>('workout_templates'),
+  trackers: flat<TrackerDef>('tracker_defs'),
+  sets: flat<WorkoutSet>('workout_sets', ['reps', 'weightKg', 'exerciseOrder', 'setIndex']),
+  checkins: flat<DayCheckin>('day_checkins', [], 'user_id,local_date'),
+  plan: flat<PlanItem>('plan_items'),
+  analystRuns: flat<AnalystRun>('analyst_runs'),
+  recommendations: flat<Recommendation>('recommendations', ['currentValue', 'suggestedValue']),
+  targets: flat<Target>('targets', ['value']),
+  items: { server: 'items', onConflict: 'id', toServer: itemToServer, fromServer: itemFromServer } as TableSpec<Item>,
 }
 
-export function targetToServer(t: Target): Row {
-  return {
-    id: t.id,
-    key: t.key,
-    value: t.value,
-    unit: t.unit,
-    effective_from: t.effectiveFrom,
-    source: t.source,
-    created_at: t.createdAt,
-    updated_at: t.updatedAt,
-    deleted_at: t.deletedAt,
-  }
-}
-
-export function targetFromServer(r: Row): Target {
-  return {
-    id: r.id as string,
-    key: r.key as Target['key'],
-    value: Number(r.value),
-    unit: r.unit as string,
-    effectiveFrom: r.effective_from as string,
-    source: r.source as Target['source'],
-    createdAt: iso(r.created_at),
-    updatedAt: iso(r.updated_at),
-    deletedAt: r.deleted_at ? iso(r.deleted_at) : null,
-  }
-}
+/* --------------------------------- settings --------------------------------- */
 
 export function settingsToServer(s: Settings, updatedAt: string): Row {
   return { currency: s.currency, timezone: s.timezone, rollover_hour: s.rolloverHour, updated_at: updatedAt }
@@ -158,11 +188,6 @@ export function settingsFromServer(r: Row): Settings {
     timezone: r.timezone as string,
     rolloverHour: Number(r.rollover_hour),
   }
-}
-
-/** Postgres returns `+00:00` offsets and microseconds; normalise to JS ISO. */
-function iso(v: unknown): string {
-  return new Date(v as string).toISOString()
 }
 
 /** True when the remote copy should replace the local one (last write wins). */

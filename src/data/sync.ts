@@ -1,4 +1,5 @@
 import * as map from '../core/sync-map'
+import { ENTRY_SELECT, FACETS, SPECS, type FacetTable, type Row, type TableSpec } from '../core/sync-map'
 import type { Settings } from '../core/types'
 import { db, DEFAULT_SETTINGS, type SyncTable } from './db'
 import { supabase } from './supabase'
@@ -29,11 +30,31 @@ export const syncStore = {
   get: () => state,
 }
 
-/** Parents before children so foreign keys resolve. */
-const ORDER: SyncTable[] = ['profiles', 'categories', 'items', 'entries', 'targets']
-const CHUNK = 500
+type SpecTable = keyof typeof SPECS
 
-type Row = Record<string, unknown>
+/** Parents before children so foreign keys resolve on the server. */
+const ORDER: SyncTable[] = [
+  'profiles',
+  'categories',
+  'foods',
+  'exercises',
+  'templates',
+  'trackers',
+  'items',
+  'entries',
+  'sets',
+  'checkins',
+  'plan',
+  'analystRuns',
+  'recommendations',
+  'targets',
+]
+
+/** Facets the app can remove from an existing entry; absent → delete server row. */
+const REMOVABLE_FACETS: FacetTable[] = ['entry_money', 'entry_nutrition']
+
+const CHUNK = 200
+const keyOf = (table: string) => (table === 'checkins' ? 'localDate' : 'id')
 
 async function upsert(table: string, rows: Row[], onConflict = 'id') {
   for (let i = 0; i < rows.length; i += CHUNK) {
@@ -47,6 +68,25 @@ async function localSettings(): Promise<{ settings: Settings; updatedAt: string 
   const v = (row?.value ?? {}) as Partial<Settings> & { updatedAt?: string }
   const { updatedAt, ...settings } = v
   return { settings: { ...DEFAULT_SETTINGS, ...settings }, updatedAt: updatedAt ?? new Date(0).toISOString() }
+}
+
+async function pushEntries(ids: string[]) {
+  const rows = (await db.entries.bulkGet(ids)).filter((r) => r != null)
+  const mapped = rows.map(map.entryToServer)
+  await upsert('entries', mapped.map((m) => m.entry))
+  for (const table of Object.keys(FACETS) as FacetTable[]) {
+    await upsert(
+      table,
+      mapped.flatMap((m) => (m.facets[table] ? [m.facets[table]] : [])),
+      'entry_id',
+    )
+    if (!REMOVABLE_FACETS.includes(table)) continue
+    const absent = mapped.filter((m) => !m.facets[table]).map((m) => m.entry.id as string)
+    for (let i = 0; i < absent.length; i += 100) {
+      const { error } = await supabase.from(table).delete().in('entry_id', absent.slice(i, i + 100))
+      if (error) throw new Error(`${table}: ${error.message}`)
+    }
+  }
 }
 
 async function push() {
@@ -66,19 +106,11 @@ async function push() {
       const { settings, updatedAt } = await localSettings()
       await upsert('profiles', [map.settingsToServer(settings, updatedAt)], 'user_id')
     } else if (table === 'entries') {
-      const rows = (await db.entries.bulkGet([...ids])).filter((r) => r != null)
-      const mapped = rows.map(map.entryToServer)
-      await upsert('entries', mapped.map((m) => m.entry))
-      await upsert('entry_money', mapped.flatMap((m) => (m.money ? [m.money] : [])), 'entry_id')
-    } else if (table === 'items') {
-      const rows = (await db.items.bulkGet([...ids])).filter((r) => r != null)
-      await upsert('items', rows.map(map.itemToServer))
-    } else if (table === 'categories') {
-      const rows = (await db.categories.bulkGet([...ids])).filter((r) => r != null)
-      await upsert('categories', rows.map(map.categoryToServer))
-    } else if (table === 'targets') {
-      const rows = (await db.targets.bulkGet([...ids])).filter((r) => r != null)
-      await upsert('targets', rows.map(map.targetToServer))
+      await pushEntries([...ids])
+    } else {
+      const spec = SPECS[table as SpecTable] as TableSpec<unknown>
+      const rows = (await db.table(table).bulkGet([...ids])).filter((r) => r != null)
+      await upsert(spec.server, rows.map(spec.toServer), spec.onConflict)
     }
   }
   // Only drop what we just sent; writes made meanwhile stay queued.
@@ -112,6 +144,14 @@ async function pullTable(table: string, select: string, apply: (rows: Row[]) => 
   }
 }
 
+/** Put remote rows whose `updatedAt` is at least as new as the local copy. */
+async function applyRemote(table: string, remote: Row[]) {
+  const k = keyOf(table)
+  const t = db.table(table)
+  const locals = (await t.bulkGet(remote.map((r) => r[k] as string))) as (Row | undefined)[]
+  await t.bulkPut(remote.filter((r, i) => map.remoteWins(locals[i]?.updatedAt as string | undefined, r.updatedAt as string)))
+}
+
 async function pull() {
   // Settings: single row.
   const { data: profile, error } = await supabase.from('profiles').select('*').maybeSingle()
@@ -126,29 +166,17 @@ async function pull() {
     }
   }
 
-  await pullTable('categories', '*', async (rows) => {
-    const remote = rows.map(map.categoryFromServer)
-    const locals = await db.categories.bulkGet(remote.map((r) => r.id))
-    await db.categories.bulkPut(remote.filter((r, i) => map.remoteWins(locals[i]?.updatedAt, r.updatedAt)))
-  })
-  await pullTable('items', '*', async (rows) => {
-    const remote = rows.map(map.itemFromServer)
-    const locals = await db.items.bulkGet(remote.map((r) => r.id))
-    await db.items.bulkPut(remote.filter((r, i) => map.remoteWins(locals[i]?.updatedAt, r.updatedAt)))
-  })
-  await pullTable('entries', '*, entry_money(*)', async (rows) => {
-    const remote = rows.map((r) => {
-      const m = r.entry_money
-      return map.entryFromServer({ ...r, entry_money: Array.isArray(m) ? (m[0] ?? null) : m })
-    })
-    const locals = await db.entries.bulkGet(remote.map((r) => r.id))
-    await db.entries.bulkPut(remote.filter((r, i) => map.remoteWins(locals[i]?.updatedAt, r.updatedAt)))
-  })
-  await pullTable('targets', '*', async (rows) => {
-    const remote = rows.map(map.targetFromServer)
-    const locals = await db.targets.bulkGet(remote.map((r) => r.id))
-    await db.targets.bulkPut(remote.filter((r, i) => map.remoteWins(locals[i]?.updatedAt, r.updatedAt)))
-  })
+  for (const table of ORDER) {
+    if (table === 'profiles') continue
+    if (table === 'entries') {
+      await pullTable('entries', ENTRY_SELECT, (rows) =>
+        applyRemote('entries', rows.map((r) => map.entryFromServer(r) as unknown as Row)),
+      )
+      continue
+    }
+    const spec = SPECS[table as SpecTable] as TableSpec<unknown>
+    await pullTable(spec.server, '*', (rows) => applyRemote(table, rows.map((r) => spec.fromServer(r) as Row)))
+  }
 }
 
 let running: Promise<void> | null = null

@@ -1,9 +1,39 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Category, Entry, Item, Settings, Target } from '../core/types'
+import type {
+  AnalystRun,
+  Category,
+  DayCheckin,
+  Entry,
+  Exercise,
+  Food,
+  Item,
+  PlanItem,
+  Recommendation,
+  Settings,
+  Target,
+  TrackerDef,
+  WorkoutSet,
+  WorkoutTemplate,
+} from '../core/types'
 
-export type SyncTable = 'profiles' | 'entries' | 'items' | 'categories' | 'targets'
+/** Local tables that sync. `profiles` is the settings row kept in `meta`. */
+export type SyncTable =
+  | 'profiles'
+  | 'categories'
+  | 'foods'
+  | 'exercises'
+  | 'templates'
+  | 'trackers'
+  | 'items'
+  | 'entries'
+  | 'sets'
+  | 'checkins'
+  | 'plan'
+  | 'analystRuns'
+  | 'recommendations'
+  | 'targets'
 
-/** A pending upload. Rows are upserted whole by id, so replaying is safe. */
+/** A pending upload. Rows are upserted whole by key, so replaying is safe. */
 export interface OutboxOp {
   seq?: number
   table: SyncTable
@@ -25,6 +55,15 @@ export const db = new Dexie('buddy') as Dexie & {
   items: EntityTable<Item, 'id'>
   categories: EntityTable<Category, 'id'>
   targets: EntityTable<Target, 'id'>
+  foods: EntityTable<Food, 'id'>
+  exercises: EntityTable<Exercise, 'id'>
+  templates: EntityTable<WorkoutTemplate, 'id'>
+  sets: EntityTable<WorkoutSet, 'id'>
+  checkins: EntityTable<DayCheckin, 'localDate'>
+  plan: EntityTable<PlanItem, 'id'>
+  trackers: EntityTable<TrackerDef, 'id'>
+  analystRuns: EntityTable<AnalystRun, 'id'>
+  recommendations: EntityTable<Recommendation, 'id'>
   outbox: EntityTable<OutboxOp, 'seq'>
   meta: EntityTable<Meta, 'key'>
 }
@@ -36,6 +75,19 @@ db.version(1).stores({
   targets: 'id, key, effectiveFrom, updatedAt',
   outbox: '++seq, table',
   meta: 'key',
+})
+
+db.version(2).stores({
+  entries: 'id, localDate, itemId, kind, updatedAt',
+  foods: 'id, barcode, lastUsedAt, updatedAt',
+  exercises: 'id, updatedAt',
+  templates: 'id, updatedAt',
+  sets: 'id, entryId, exerciseId, updatedAt',
+  checkins: 'localDate, updatedAt',
+  plan: 'id, kind, localDate, updatedAt',
+  trackers: 'id, updatedAt',
+  analystRuns: 'id, updatedAt',
+  recommendations: 'id, runId, status, updatedAt',
 })
 
 export const DEFAULT_SETTINGS: Settings = {
