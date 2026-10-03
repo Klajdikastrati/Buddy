@@ -43,7 +43,7 @@ Decided 2026-10-03 by the user: build everything now instead of phase-by-phase u
    tap-to-copy last set, ✓ per set, add set/exercise, finish → summary (duration, sets, volume, Δ vs last same
    template, PRs by heaviest weight and Epley e1RM). `/training` history + per-exercise progress.
    Today: "Pull Day · Start" when a template's weekday is today.
-5. **Plan** — Plan tab appears: today's tasks (priorities), routines for today (tick → `doneDates`), weekly goals,
+5. ~~**Plan**~~ — done (overdue tasks carry over; quick-add for today; routine/goal sheet; Plan tab in the right group). Spec: Plan tab appears: today's tasks (priorities), routines for today (tick → `doneDates`), weekly goals,
    upcoming tasks. Today shows ≤3 priorities.
 6. **History & signals + custom trackers** — History segmented Days | Trends | Signals. Trends: 30-day averages
    vs previous 30 (spend/day, kcal, protein, sleep, weight, workouts/week, km). Signals: Pearson r between daily

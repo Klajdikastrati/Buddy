@@ -186,3 +186,20 @@ export function DaySwitcher({ label, onPrev, onNext, canNext }: { label: string;
     </div>
   )
 }
+
+/** Round checkbox (44px hit area) for plan items. */
+export function Tick({ checked, onToggle, label, tint }: { checked: boolean; onToggle: () => void; label: string; tint?: string }) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      className="tick"
+      style={tint ? ({ '--tint': tint } as React.CSSProperties) : undefined}
+      onClick={onToggle}
+    >
+      <span className="tick-box">{checked && <Icon name="check" size={15} strokeWidth={3} />}</span>
+    </button>
+  )
+}

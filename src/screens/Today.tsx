@@ -4,6 +4,7 @@ import { ACTIVITY_LABEL, activityOn, sleepSummary, weightSummary } from '../core
 import { addDays, formatDuration, formatLongDate, formatShortDate, hourIn, monthStart, weekdayOf, weekStart } from '../core/dates'
 import { formatMoney, moneySummary } from '../core/money'
 import { nutritionOn } from '../core/nutrition'
+import { priorities } from '../core/plan'
 import { formatNumber } from '../core/numbers'
 import { targetOn } from '../core/targets'
 import { durationMin, finishedWorkouts, templatesOn, workoutsInWeek } from '../core/training'
@@ -16,6 +17,7 @@ import { openEntry } from '../ui/entryActions'
 import { EntryRow } from '../ui/EntryRow'
 import { navigate, useSettings, useToday } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
+import { PlanRow } from '../ui/PlanRow'
 import { Ring } from '../ui/Ring'
 import { openSheet } from '../ui/sheets'
 
@@ -37,10 +39,13 @@ export function Today() {
   const checkin = useLiveQuery(async () => (await db.checkins.get(today)) ?? null, [today])
   const templates = useLiveQuery(() => db.templates.filter((t) => !t.deletedAt && !t.archived).toArray(), [])
   const activeWorkout = useLiveQuery(async () => ((await db.meta.get('activeWorkout'))?.value as ID | undefined) ?? null, [])
+  const plan = useLiveQuery(() => db.plan.toArray(), [])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
   const catName = useMemo(() => new Map(categories?.map((c) => [c.id, c.name])), [categories])
 
-  if (!entries || firstDay === undefined || !targets || !weights || checkin === undefined || !templates || activeWorkout === undefined) return null
+  if (!entries || firstDay === undefined || !targets || !weights || checkin === undefined || !templates || activeWorkout === undefined || !plan)
+    return null
+  const top = priorities(plan, today)
 
   const todays = entries
     .filter((e) => e.localDate === today && !e.deletedAt)
@@ -53,6 +58,25 @@ export function Today() {
         <span className="eyebrow">{formatLongDate(today)}</span>
         <h1>Today</h1>
       </header>
+
+      {top.shown.length > 0 && (
+        <section aria-labelledby="prio-h">
+          <div className="row-between">
+            <h2 id="prio-h" className="section-title">
+              Priorities
+            </h2>
+            <button type="button" className="btn-text" onClick={() => navigate('/plan')}>
+              {top.more ? `+${top.more} more` : 'Plan'}
+              <Icon name="chevronRight" size={16} strokeWidth={2.2} />
+            </button>
+          </div>
+          <ul className="list plan-list">
+            {top.shown.map((t) => (
+              <PlanRow key={t.id} item={t} today={today} sub={t.localDate && t.localDate < today ? `From ${formatShortDate(t.localDate)}` : undefined} />
+            ))}
+          </ul>
+        </section>
+      )}
 
       {!activeWorkout && <PlannedWorkout entries={entries} templates={templates} today={today} />}
 

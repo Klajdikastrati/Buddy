@@ -9,6 +9,7 @@ import { ActivitySheet } from './features/ActivitySheet'
 import { CheckinSheet } from './features/CheckinSheet'
 import { FoodEditorSheet } from './features/FoodEditorSheet'
 import { FoodSheet } from './features/FoodSheet'
+import { PlanItemSheet } from './features/PlanItemSheet'
 import { MoneySheet } from './features/MoneySheet'
 import { QuickAddSheet } from './features/QuickAddSheet'
 import { ExerciseSheet } from './features/ExerciseSheet'
@@ -25,6 +26,7 @@ import { MeFoods } from './screens/MeFoods'
 import { MeTargets } from './screens/MeTargets'
 import { MeTraining } from './screens/MeTraining'
 import { Nutrition } from './screens/Nutrition'
+import { Plan } from './screens/Plan'
 import { Training } from './screens/Training'
 import { Workout } from './screens/Workout'
 import { Today } from './screens/Today'
@@ -44,12 +46,16 @@ const LEFT: Tab[] = [
   { path: '/', label: 'Today', icon: 'today' },
   { path: '/history', label: 'History', icon: 'history' },
 ]
-const RIGHT: Tab[] = [{ path: '/me', label: 'Me', icon: 'me' }]
+const RIGHT: Tab[] = [
+  { path: '/plan', label: 'Plan', icon: 'plan' },
+  { path: '/me', label: 'Me', icon: 'me' },
+]
 
 const ROUTES: Record<string, () => React.ReactNode> = {
   '/': Today,
   '/history': History,
   '/me': Me,
+  '/plan': Plan,
   '/me/targets': MeTargets,
   '/me/foods': MeFoods,
   '/nutrition': Nutrition,
@@ -137,6 +143,7 @@ function Shell({ userId }: { userId: string }) {
       {sheet.kind === 'template' && <TemplateSheet key={sheet.template?.id ?? 'new'} template={sheet.template} />}
       {sheet.kind === 'workout-summary' && <WorkoutSummarySheet key={sheet.entryId} entryId={sheet.entryId} />}
       {sheet.kind === 'exercise' && <ExerciseSheet key={sheet.exerciseId} exerciseId={sheet.exerciseId} />}
+      {sheet.kind === 'plan-item' && <PlanItemSheet key={sheet.item?.id ?? 'new'} item={sheet.item} planKind={sheet.planKind} />}
       <Toaster />
     </>
   )

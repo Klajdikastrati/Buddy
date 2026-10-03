@@ -1919,3 +1919,85 @@ select.input-inline {
   align-items: center;
   text-align: center;
 }
+
+/* ---- Plan ---- */
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.row-between .section-title {
+  margin-bottom: 0;
+}
+
+section > .row-between {
+  margin-bottom: 8px;
+}
+
+.screen-head.row-between {
+  align-items: flex-end;
+}
+
+.tick {
+  flex: none;
+  width: 48px;
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  padding: 0 0 0 6px;
+}
+
+.tick-box {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 2px var(--fg-3);
+  color: #fff;
+  transition: background-color 120ms var(--ease), box-shadow 120ms var(--ease), transform 100ms var(--ease);
+}
+
+.tick:active .tick-box {
+  transform: scale(0.9);
+}
+
+.tick[aria-checked='true'] .tick-box {
+  background: var(--tint, var(--accent));
+  box-shadow: none;
+}
+
+.plan-list {
+  --row-inset: 54px;
+}
+
+.plan-row .row-main {
+  padding-left: 6px;
+}
+
+.plan-row.is-done .row-title {
+  color: var(--fg-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--fg-3);
+}
+
+.plan-kind {
+  padding-right: 6px;
+}
+
+.quick-task {
+  margin-top: 8px;
+}
+
+.input-date {
+  width: auto;
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 15px;
+}
