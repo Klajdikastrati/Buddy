@@ -11,6 +11,8 @@ browser at 390×844 with test data). Nothing has run against the real database y
   barcode scan, price → money facet), Training (templates, Workout Mode, PRs, history), Plan (tasks, routines,
   weekly goals, Today priorities), History (Days | Trends | Signals), custom trackers, Analyst export + import.
 - Premium visual refresh (UI_UX.md "premium calm"); + centred in the tab bar (left group · + · right group).
+- After the user's first look: compact Today (all numbers above the fold) and Instagram-style navigation —
+  swipeable tab pager, pushed screens with edge-swipe back, draggable sheets, per-page gated live data.
 - Pure logic in `src/core/*` with 61 Vitest tests; writes in `src/data/repo-*.ts`; one daily series
   (`core/series.ts`) feeds Trends, Signals and the export.
 
@@ -41,6 +43,8 @@ recurring expenses + category budgets (after real use) · water/screen-time/care
 - Workout Mode: no rest timer, warm-up flag not settable in the UI. Analyst "Apply" has no Undo (edit the target
   in Me → Targets). Sleep "last night" includes naps logged that day.
 - Lint warnings only (`Date.now()` during render in a few sheets) — harmless.
+- Motion measured in dev only (StrictMode, unminified): pushed screens fill in ~55 ms, Workout Mode's rows
+  ~0.2–0.4 s behind an instant placeholder frame. Re-check on the iPhone with a production build.
 - 2026-10-03 — User: the look is "very basic… like a 2010 website", wants a more premium feel. Done mid-session as a
   design-system refresh (see UI_UX.md) before building the remaining screens, so they inherit it.
 - Undo of a one-tap log leaves the item's `useCount` incremented (harmless ranking nudge).
