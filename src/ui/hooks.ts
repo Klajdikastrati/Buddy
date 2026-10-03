@@ -77,15 +77,27 @@ export function useKeyboardInset() {
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
+    // iOS fires several resize/scroll events while the keyboard settles; apply at most
+    // once per frame and ignore sub-pixel noise so the sheet doesn't jitter.
+    let last = { kb: -1, vvh: -1 }
+    let frame = 0
+    const apply = () => {
+      frame = 0
+      const kb = Math.round(Math.max(0, window.innerHeight - vv.height - vv.offsetTop))
+      const vvh = Math.round(vv.height)
+      if (Math.abs(kb - last.kb) < 2 && Math.abs(vvh - last.vvh) < 2) return
+      last = { kb, vvh }
+      document.documentElement.style.setProperty('--kb', `${kb}px`)
+      document.documentElement.style.setProperty('--vvh', `${vvh}px`)
+    }
     const update = () => {
-      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
-      document.documentElement.style.setProperty('--kb', `${inset}px`)
-      document.documentElement.style.setProperty('--vvh', `${vv.height}px`)
+      if (!frame) frame = requestAnimationFrame(apply)
     }
     update()
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
     return () => {
+      cancelAnimationFrame(frame)
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
     }

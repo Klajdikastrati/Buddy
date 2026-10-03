@@ -1,5 +1,5 @@
 import { useLiveQuery } from './ui/live'
-import { memo, useEffect, useLayoutEffect, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ID } from './core/types'
 import { db } from './data/db'
 import { ensureDefaults } from './data/repo'
@@ -37,17 +37,12 @@ import { Training } from './screens/Training'
 import { Workout } from './screens/Workout'
 import { Today } from './screens/Today'
 import { navigate, useKeyboardInset, usePath, useSession } from './ui/hooks'
-import { Icon, type IconName } from './ui/icons'
+import { Icon } from './ui/icons'
 import { Pager, scrollPageTop } from './ui/Pager'
 import { openSheet, useSheet } from './ui/sheets'
 import { StackLayer, type StackRoute } from './ui/Stack'
+import { TabBar, type BubbleFn, type Tab } from './ui/TabBar'
 import { Toaster } from './ui/toast'
-
-interface Tab {
-  path: string
-  label: string
-  icon: IconName
-}
 
 // The + always sits in the centre: tabs split into a left and a right group.
 const LEFT: Tab[] = [
@@ -134,27 +129,7 @@ function Shell({ userId }: { userId: string }) {
   }, [path])
   const pushed = !!STACK[path]
 
-  const tab = (t: Tab) => {
-    const i = TABS.indexOf(t)
-    const current = i === tabIndex
-    return (
-      <a
-        key={t.path}
-        href={t.path}
-        className="tab"
-        aria-current={current ? 'page' : undefined}
-        onClick={(e) => {
-          e.preventDefault()
-          // Tapping the tab you're on scrolls it to the top (or closes a pushed screen).
-          if (current && !pushed) scrollPageTop(i)
-          else navigate(t.path)
-        }}
-      >
-        <Icon name={t.icon} size={24} strokeWidth={current ? 2.1 : 1.8} />
-        <span>{t.label}</span>
-      </a>
-    )
-  }
+  const bubble = useRef<BubbleFn | null>(null)
 
   return (
     <div className="shell">
@@ -162,19 +137,23 @@ function Shell({ userId }: { userId: string }) {
         index={tabIndex}
         covered={pushed}
         onSwipe={(i) => navigate(TABS[i].path)}
+        onPosition={(pos, live) => bubble.current?.(pos, live)}
         pages={TAB_PAGES}
       />
 
       {path !== '/workout' && <ResumeBar />}
-      <nav className="tabbar" aria-label="Main">
-        <div className="tab-group">{LEFT.map(tab)}</div>
-        <button type="button" className="tab tab-add" aria-label="Quick add" onClick={() => openSheet({ kind: 'quick-add' })}>
-          <span className="add-disc">
-            <Icon name="plus" size={24} strokeWidth={2.4} />
-          </span>
-        </button>
-        <div className="tab-group">{RIGHT.map(tab)}</div>
-      </nav>
+      <TabBar
+        left={LEFT}
+        right={RIGHT}
+        current={tabIndex}
+        bind={(fn) => (bubble.current = fn)}
+        onAdd={() => openSheet({ kind: 'quick-add' })}
+        onTab={(i) => {
+          // Tapping the tab you're on scrolls it to the top (or closes a pushed screen).
+          if (i === tabIndex && !pushed) scrollPageTop(i)
+          else navigate(TABS[i].path)
+        }}
+      />
 
       <StackLayer path={path} routes={STACK} onBack={navigate} />
 

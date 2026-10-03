@@ -33,9 +33,12 @@ export function Pager({
   onSwipe,
   covered,
   pages,
+  onPosition,
 }: {
   index: number
   onSwipe: (index: number) => void
+  /** Fractional page position while dragging (live) or the target on settle — drives the tab bubble. */
+  onPosition?: (pos: number, live: boolean) => void
   /** A pushed screen is on top: shift back and dim, ignore swipes. */
   covered: boolean
   pages: ReactNode[]
@@ -52,6 +55,8 @@ export function Pager({
 
   useLayoutEffect(() => gateAll(false), [index, covered]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const prev = useRef(index)
+
   const place = (i: number, animate: boolean, offsetPx = 0) => {
     const el = track.current
     if (!el) return
@@ -59,9 +64,18 @@ export function Pager({
     el.style.transform = `translate3d(calc(${(-i * 100) / count}% + ${offsetPx}px), 0, 0)`
   }
 
-  // Follow the active index; the first placement is instant.
+  // Follow the active index; the first placement is instant. A jump of more than
+  // one tab only travels one page width (from the neighbouring side) — sweeping
+  // across every page in between is too much motion.
   useLayoutEffect(() => {
+    const from = prev.current
+    prev.current = index
+    if (!first.current && Math.abs(index - from) > 1) {
+      place(index + (index > from ? -1 : 1), false)
+      void track.current?.offsetWidth
+    }
     place(index, !first.current)
+    onPosition?.(index, false)
     first.current = false
   }, [index])
 
@@ -92,6 +106,7 @@ export function Pager({
         const atEdge = (index === 0 && dx > 0) || (index === count - 1 && dx < 0)
         d.dx = atEdge ? dx * 0.3 : dx
         place(index, false, d.dx)
+        onPosition?.(Math.max(0, Math.min(count - 1, index - d.dx / d.width)), true)
       }}
       onPointerUp={(e) => {
         const d = drag.current
@@ -105,12 +120,14 @@ export function Pager({
         if (next !== index) onSwipe(next)
         else {
           place(index, true)
+          onPosition?.(index, false)
           gateAll(false)
         }
       }}
       onPointerCancel={() => {
         if (drag.current?.mode === 'horizontal') {
           place(index, true)
+          onPosition?.(index, false)
           gateAll(false)
         }
         drag.current = null
