@@ -4,9 +4,10 @@
 src/core/      pure TypeScript domain logic — no React, no storage. Portable to a future native client.
 src/data/      Dexie (IndexedDB) schema, sync, and all writes: repo-base.ts (put + queue helpers),
                repo.ts (settings, money, categories, items, targets), repo-<domain>.ts per domain
-src/ui/        hooks, router, Sheet, toast, shared rows
-src/features/  sheets: QuickAdd, Money
-src/screens/   Today, History, Me
+src/ui/        hooks + router, Sheet, toast, icons, domain tints, fields, rows, Ring/Bar/Sparkline
+src/features/  sheets (one global sheet at a time, `ui/sheets.ts`): Quick Add, money, food (+ scanner, editor,
+               recipe), body sheets, workout start/template/summary, plan item, trackers, export
+src/screens/   tabs (Today, History, Plan, Me), domain screens (/nutrition, /training, /workout) and /me/* settings
 ```
 
 ## Stack
@@ -17,7 +18,7 @@ src/screens/   Today, History, Me
 | Cloud | Supabase (Postgres, Auth, RLS), region eu-central-1 | Source of truth + sync; RLS is the security boundary |
 | Offline shell | vite-plugin-pwa (Workbox `generateSW`) | App opens from disk, works offline |
 | Tests | Vitest — pure `core/` logic only | |
-| Router | ~20-line pathname router in `ui/hooks.ts` | Three screens don't need a library |
+| Router | ~20-line pathname router in `ui/hooks.ts` + a route table in `App.tsx` | Flat paths, no params — no library needed |
 
 No UI kit, no icon lib, no chart lib, no state lib. Adding a significant dependency needs a demonstrated problem.
 Assets: Inter variable font, Latin subset (`public/fonts`, 48 KB, OFL, precached) — only used where SF Pro isn't

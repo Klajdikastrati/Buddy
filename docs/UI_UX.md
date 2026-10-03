@@ -14,9 +14,11 @@ Sleep (vs 30-day avg of logged nights), Weight (Δ vs ~7 days), Activity (minute
 after 19:00 a "How was today?" prompt if it isn't. Then today's entries.
 
 ## Quick Add
-- Opens instantly. Expense / Income actions on top, search, then recents (frecency; pinned first) near the thumb.
+- Opens instantly. A 4-column grid of icon actions (Food, Expense, Workout, Sleep, Weight, Activity, Check-in,
+  Income, then custom trackers), search, then recents (frecency; pinned first) near the thumb.
 - Tap a recent → logged with remembered values + Undo toast (2 taps total).
-- Tap a recent's amount → opens the form prefilled (price changed).
+- Tap a recent's amount → opens the form prefilled (price changed; for food: portion/price).
+- Workout Mode is the one full-screen flow: no tab bar, survives reloads, a resume bar follows you elsewhere.
 - Search with no match → "Add “x”".
 
 ## Forms

@@ -16,6 +16,8 @@ computed client-side from a few dozen rows. No server rendering, no per-screen a
   Today 32 ms · open Quick Add 25 ms (click → painted). For comparison LevelUp measured 298–483 ms per tab on
   localhost before any real network latency.
 - Production bundle: 108 KB gzip JS, 2.5 KB CSS (before supabase-js is imported).
+- 2026-10-03, all phases built: 185 KB gzip main JS, 5 KB CSS; barcode scanner (2 KB) + ZXing ponyfill are lazy
+  chunks and the 1.1 MB wasm loads only on first scan (not precached). Inter font 48 KB, precached.
 
 ## Why LevelUp was slow (don't repeat)
 Server-rendered every tap, server-awaited every save + page re-render, auth re-checked up to 4× per navigation,
