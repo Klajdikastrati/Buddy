@@ -28,5 +28,8 @@ Success metric: still opened daily six months from now.
 - 2026-10-03 — Money ships first (with the foundation) so Buddy is used from week 1.
 - 2026-10-03 — Plan tab hidden until Phase 5 — no empty tabs.
 - 2026-10-03 — Visual direction raised to "premium calm" (user: too basic). The + stays centred in the tab bar.
+- 2026-10-03 — The Analyst is the user's personal analyst & planner (Claude Project briefed by `docs/ANALYST.md`):
+  it reads exports, plans *with* the user, and injects agreed targets + plan items via an imported file approved
+  item by item. Buddy itself stays AI-free; "not a coach" applies to the app, not to the Analyst.
 - 2026-10-03 — Today is a compact tile grid (user dislikes scrolling); navigation is Instagram-style spatial
   motion — swipeable tab pager, pushed screens, draggable sheets (user: static/delayed feel is very noticeable).

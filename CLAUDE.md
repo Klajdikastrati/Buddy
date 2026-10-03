@@ -1,7 +1,7 @@
 # Buddy — working rules
 
 Read `docs/ROADMAP.md` first (current phase, handoff state, what's waiting on the user). Source of truth: the six
-files in `docs/`. Update the relevant one when a decision changes; keep each short.
+files in `docs/`, plus `docs/ANALYST.md` (the Buddy Analyst brief — keep it in sync with the export/import formats). Update the relevant one when a decision changes; keep each short.
 
 ## Context
 - Single user, lives in Albania: currency Lek (`ALL`), timezone `Europe/Tirane`. Uses an iPhone (app is a PWA,
