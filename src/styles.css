@@ -2001,3 +2001,106 @@ section > .row-between {
   padding: 0 12px;
   font-size: 15px;
 }
+
+/* ---- History: trends & signals ---- */
+
+.day-totals {
+  font-size: 13px;
+}
+
+.trend-row {
+  align-items: center;
+  padding-right: 16px;
+}
+
+.trend-label,
+.trend-values {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.trend-label > span:first-child {
+  font-weight: 550;
+}
+
+.trend-values {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.trend-current {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.signal {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1), var(--highlight);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.signal-text {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.signal-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.signal-mid {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--fg-3);
+  border-radius: 1px;
+}
+
+.signal-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: var(--c-analyst);
+}
+
+.signal-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fg-2);
+  flex-wrap: wrap;
+}
+
+.notice strong {
+  color: var(--fg);
+}
+
+.action-label {
+  max-width: 100%;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tracker-field {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1), var(--highlight);
+  padding: 12px;
+}

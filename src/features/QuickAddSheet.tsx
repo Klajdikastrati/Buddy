@@ -20,6 +20,7 @@ export function QuickAddSheet() {
   const [query, setQuery] = useState('')
   const items = useLiveQuery(() => db.items.toArray(), [])
   const foods = useLiveQuery(() => db.foods.toArray(), [])
+  const trackers = useLiveQuery(() => db.trackers.filter((t) => !t.deletedAt && !t.archived).toArray(), [])
   const foodById = useMemo(() => new Map(foods?.map((f) => [f.id, f])), [foods])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
   const catName = useMemo(() => new Map(categories?.map((c) => [c.id, c.name])), [categories])
@@ -47,7 +48,7 @@ export function QuickAddSheet() {
   }
 
   const q = query.trim()
-  const actions: { domain: DomainKey; open: () => void }[] = [
+  const actions: { key?: string; domain: DomainKey; label?: string; open: () => void }[] = [
     { domain: 'food', open: () => openSheet({ kind: 'food', query: q || undefined }) },
     { domain: 'expense', open: () => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q || undefined } }) },
     { domain: 'workout', open: () => openSheet({ kind: 'workout-start' }) },
@@ -56,15 +57,18 @@ export function QuickAddSheet() {
     { domain: 'activity', open: () => openSheet({ kind: 'activity' }) },
     { domain: 'checkin', open: () => openSheet({ kind: 'checkin' }) },
     { domain: 'income', open: () => openSheet({ kind: 'money', prefill: { kind: 'income', title: q || undefined } }) },
+    ...(trackers ?? [])
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((t) => ({ key: t.id, domain: 'tracker' as const, label: t.name, open: () => openSheet({ kind: 'tracker-log', trackerId: t.id }) })),
   ]
 
   return (
     <Sheet open onClose={closeSheet} title="Quick add">
       <div className="quick-actions">
         {actions.map((a) => (
-          <button key={a.domain} type="button" className="action" onClick={a.open}>
+          <button key={a.key ?? a.domain} type="button" className="action" onClick={a.open}>
             <IconChip name={DOMAIN[a.domain].icon} tint={DOMAIN[a.domain].tint} size="lg" />
-            {DOMAIN[a.domain].label}
+            <span className="action-label">{a.label ?? DOMAIN[a.domain].label}</span>
           </button>
         ))}
       </div>

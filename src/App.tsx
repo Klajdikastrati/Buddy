@@ -15,6 +15,7 @@ import { QuickAddSheet } from './features/QuickAddSheet'
 import { ExerciseSheet } from './features/ExerciseSheet'
 import { RecipeSheet } from './features/RecipeSheet'
 import { TemplateSheet } from './features/TemplateSheet'
+import { TrackerDefSheet, TrackerLogSheet } from './features/TrackerSheets'
 import { WorkoutStartSheet } from './features/WorkoutStartSheet'
 import { WorkoutSummarySheet } from './features/WorkoutSummary'
 import { SleepSheet } from './features/SleepSheet'
@@ -24,6 +25,7 @@ import { Login } from './screens/Login'
 import { Me } from './screens/Me'
 import { MeFoods } from './screens/MeFoods'
 import { MeTargets } from './screens/MeTargets'
+import { MeTrackers } from './screens/MeTrackers'
 import { MeTraining } from './screens/MeTraining'
 import { Nutrition } from './screens/Nutrition'
 import { Plan } from './screens/Plan'
@@ -61,6 +63,7 @@ const ROUTES: Record<string, () => React.ReactNode> = {
   '/nutrition': Nutrition,
   '/training': Training,
   '/me/training': MeTraining,
+  '/me/trackers': MeTrackers,
   '/workout': Workout,
 }
 
@@ -144,6 +147,8 @@ function Shell({ userId }: { userId: string }) {
       {sheet.kind === 'workout-summary' && <WorkoutSummarySheet key={sheet.entryId} entryId={sheet.entryId} />}
       {sheet.kind === 'exercise' && <ExerciseSheet key={sheet.exerciseId} exerciseId={sheet.exerciseId} />}
       {sheet.kind === 'plan-item' && <PlanItemSheet key={sheet.item?.id ?? 'new'} item={sheet.item} planKind={sheet.planKind} />}
+      {sheet.kind === 'tracker-def' && <TrackerDefSheet key={sheet.def?.id ?? 'new'} def={sheet.def} />}
+      {sheet.kind === 'tracker-log' && <TrackerLogSheet key={sheet.entry?.id ?? sheet.trackerId} trackerId={sheet.trackerId} entry={sheet.entry} />}
       <Toaster />
     </>
   )

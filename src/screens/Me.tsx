@@ -30,6 +30,7 @@ export function Me() {
   const items = useLiveQuery(() => db.items.filter((i) => !i.deletedAt).toArray(), [])
   const pending = useLiveQuery(() => db.outbox.count(), [])
   const foodCount = useLiveQuery(() => db.foods.filter((f) => !f.deletedAt && !f.archived).count(), [])
+  const trackerCount = useLiveQuery(() => db.trackers.filter((t) => !t.deletedAt && !t.archived).count(), [])
   const [newCat, setNewCat] = useState('')
 
   const setTargets = targets ? TARGET_DEFS.filter((d) => targetOn(targets, d.key, today) != null) : []
@@ -62,6 +63,7 @@ export function Me() {
         <NavRow icon="target" tint={DOMAIN.plan.tint} label="Targets" trail={targetsTrail} onClick={() => navigate('/me/targets')} />
         <NavRow icon="food" tint={DOMAIN.food.tint} label="Foods & recipes" trail={foodCount ? `${foodCount}` : undefined} onClick={() => navigate('/me/foods')} />
         <NavRow icon="workout" tint={DOMAIN.workout.tint} label="Training" trail="Templates & exercises" onClick={() => navigate('/me/training')} />
+        <NavRow icon="tracker" tint={DOMAIN.tracker.tint} label="Custom trackers" trail={trackerCount ? `${trackerCount}` : undefined} onClick={() => navigate('/me/trackers')} />
       </section>
 
       <section className="group" aria-labelledby="cat-set">

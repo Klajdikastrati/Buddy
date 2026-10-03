@@ -13,3 +13,17 @@ export function formatNumber(n: number, digits = 1): string {
 
 /** 62.5 → "62.5 kg". */
 export const formatKg = (n: number, digits = 1) => `${formatNumber(n, digits)} kg`
+
+/** "Glasses of water" → "glasses_of_water", unique among `taken`. */
+export function slugKey(label: string, taken: string[]): string {
+  const base =
+    label
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '') || 'field'
+  let key = base
+  for (let i = 2; taken.includes(key); i++) key = `${base}_${i}`
+  return key
+}

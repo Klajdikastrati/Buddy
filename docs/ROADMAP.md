@@ -45,7 +45,7 @@ Decided 2026-10-03 by the user: build everything now instead of phase-by-phase u
    Today: "Pull Day · Start" when a template's weekday is today.
 5. ~~**Plan**~~ — done (overdue tasks carry over; quick-add for today; routine/goal sheet; Plan tab in the right group). Spec: Plan tab appears: today's tasks (priorities), routines for today (tick → `doneDates`), weekly goals,
    upcoming tasks. Today shows ≤3 priorities.
-6. **History & signals + custom trackers** — History segmented Days | Trends | Signals. Trends: 30-day averages
+6. ~~**History & signals + custom trackers**~~ — done (`core/series.ts` daily series shared with export; signals with n, r, 95% CI; trackers in Quick Add + Trends). Spec: History segmented Days | Trends | Signals. Trends: 30-day averages
    vs previous 30 (spend/day, kcal, protein, sleep, weight, workouts/week, km). Signals: Pearson r between daily
    series (sleep→energy/mood same day, caffeine→sleep next night, workout→mood, spend↔mood, weekday vs weekend),
    only when n ≥ 14, always labelled "association, not cause" with n. Custom trackers: define in Me (fields
