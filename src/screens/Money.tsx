@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { addDays, daysInMonth, formatShortDate, monthStart } from '../core/dates'
+import { forecast, type Forecast } from '../core/forecast'
 import { formatMoney, moneySummary, monthMoney } from '../core/money'
 import { formatNumber } from '../core/numbers'
 import { targetOn } from '../core/targets'
@@ -11,6 +12,8 @@ import { EntryRow } from '../ui/EntryRow'
 import { DaySwitcher, SubHead } from '../ui/fields'
 import { navigate, useSettings, useToday } from '../ui/hooks'
 import { useLiveQuery } from '../ui/live'
+import { openSheet } from '../ui/sheets'
+import type { MoneyPlan } from '../core/types'
 
 const monthLabel = (d: string) =>
   new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${d}T00:00:00Z`))
@@ -24,18 +27,21 @@ export function Money() {
   const isCurrent = month === monthStart(today)
   const from = monthStart(addDays(month, -1))
   const data = useLiveQuery(async () => {
-    const [entries, targets, categories, first] = await Promise.all([
-      db.entries.where('localDate').aboveOrEqual(from).toArray(),
+    const [entries, targets, categories, first, plans] = await Promise.all([
+      // Back to the earlier of last month and 31 days ago: the forecast needs a month of everyday spending.
+      db.entries.where('localDate').aboveOrEqual(from < addDays(today, -31) ? from : addDays(today, -31)).toArray(),
       db.targets.toArray(),
       db.categories.toArray(),
       db.entries
         .orderBy('localDate')
         .filter((e) => !!e.money && !e.deletedAt)
         .first(),
+      db.moneyPlans.toArray(),
     ])
-    return { entries, targets, categories, firstDay: first?.localDate ?? null }
-  }, [from])
+    return { entries, targets, categories, firstDay: first?.localDate ?? null, plans: plans.filter((p) => !p.deletedAt) }
+  }, [from, today])
   const catName = useMemo(() => new Map(data?.categories.map((c) => [c.id, c.name])), [data])
+  const f = useMemo(() => (data ? forecast(data.entries, data.plans, today) : null), [data, today])
 
   if (!data) return <SubHead title="Money" back={() => navigate('/')} />
   // The budget that applied: today's for this month, the month-end one for a past month.
@@ -57,6 +63,8 @@ export function Money() {
         onNext={() => setMonth(monthStart(addDays(month, 40)))}
         canNext={!isCurrent}
       />
+
+      {isCurrent && f && <Planner f={f} plans={data.plans} today={today} fmt={fmt} short={short} />}
 
       <section className="block" style={tint} aria-label="This month">
         <span className="block-label">{isCurrent ? 'Spent this month' : 'Spent'}</span>
@@ -175,5 +183,141 @@ export function Money() {
         )}
       </section>
     </div>
+  )
+}
+
+/** Balance now → where it's heading → what's coming → the plan itself. */
+function Planner({ f, plans, today, fmt, short }: { f: Forecast; plans: MoneyPlan[]; today: string; fmt: (n: number) => string; short: (n: number) => string }) {
+  const tint = { '--tint': DOMAIN.money.tint } as React.CSSProperties
+  const live = plans.filter((p) => !p.archived)
+  const monthly = live.filter((p) => p.kind === 'income' || p.kind === 'bill').sort((a, b) => (a.dayOfMonth ?? 0) - (b.dayOfMonth ?? 0))
+  const planned = live.filter((p) => p.kind === 'planned').sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+  const income = monthly.filter((p) => p.kind === 'income').reduce((t, p) => t + p.amount, 0)
+  const bills = monthly.filter((p) => p.kind === 'bill').reduce((t, p) => t + p.amount, 0)
+  const soon = f.upcoming.filter((e) => e.date <= addDays(today, 31))
+  const byId = new Map(plans.map((p) => [p.id, p]))
+  const signed = (n: number) => `${n >= 0 ? '+' : '−'}${short(Math.abs(n))}`
+  const when = (d: string) => (d === today ? 'Today' : d === addDays(today, 1) ? 'Tomorrow' : formatShortDate(d))
+
+  return (
+    <>
+      {f.balance == null ? (
+        <button type="button" className="block" style={tint} onClick={() => openSheet({ kind: 'balance', current: null })}>
+          <span className="block-label">Balance</span>
+          <p className="stat-note">Set what you have now — then you’ll see where it’s heading, what’s safe to spend per day, and what’s coming.</p>
+          <span className="btn btn-primary">Set balance</span>
+        </button>
+      ) : (
+        <button type="button" className="block" style={tint} aria-label="Balance now — tap to update" onClick={() => openSheet({ kind: 'balance', current: f.balance })}>
+          <span className="block-label">Balance now</span>
+          <p className="stat">
+            <span className={`stat-value num ${f.balance < 0 ? 'negative' : ''}`}>
+              {f.balance < 0 ? '−' : ''}
+              {fmt(Math.abs(f.balance))}
+            </span>
+          </p>
+          <p className="stat-note num">
+            {f.nextPayday && f.safePerDay != null
+              ? f.safePerDay > 0
+                ? `${short(f.safePerDay)}/day free until payday · ${when(f.nextPayday)}`
+                : `Bills and plans before payday (${when(f.nextPayday)}) are more than you have`
+              : 'Add your income to see what’s free per day until payday'}
+          </p>
+          {f.projectedBeforePayday != null && (
+            <div className="money-split num">
+              <span>
+                <span className="muted">Left at payday </span>
+                <span className={f.projectedBeforePayday < 0 ? 'negative' : ''}>{signed(f.projectedBeforePayday)}</span>
+              </span>
+              <span>
+                <span className="muted">Everyday </span>
+                {f.everydayPerDay != null ? `${short(f.everydayPerDay)}/day` : '—'}
+              </span>
+            </div>
+          )}
+        </button>
+      )}
+
+      {f.daily.length > 0 && (
+        <section className="chart-card" aria-label="Balance ahead">
+          <span className="block-label">Balance ahead · at your everyday pace</span>
+          <DayChart
+            points={f.daily.map((d) => ({ date: d.date, value: d.balance }))}
+            tint={DOMAIN.money.tint}
+            format={fmt}
+            label={formatShortDate}
+            mode="line"
+            highlight={f.nextPayday ?? undefined}
+          />
+        </section>
+      )}
+
+      {soon.length > 0 && (
+        <section className="group" aria-labelledby="soon-h">
+          <h2 id="soon-h" className="section-label">
+            Coming up · 31 days
+          </h2>
+          <div className="settings-group">
+            {soon.map((e) => (
+              <button
+                key={`${e.planId}-${e.date}`}
+                type="button"
+                className="setting setting-button"
+                onClick={() => openSheet({ kind: 'money-plan', plan: byId.get(e.planId) })}
+              >
+                <span className="truncate">
+                  <span className="muted num">{when(e.date)} · </span>
+                  {e.name}
+                </span>
+                <span className={`setting-trail num ${e.amount > 0 ? 'positive' : ''}`}>{signed(e.amount)}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="group" aria-labelledby="plan-h">
+        <h2 id="plan-h" className="section-label">
+          Money plan
+        </h2>
+        {monthly.length + planned.length > 0 && (
+          <div className="settings-group">
+            {monthly.map((p) => (
+              <button key={p.id} type="button" className="setting setting-button" onClick={() => openSheet({ kind: 'money-plan', plan: p })}>
+                <span className="truncate">
+                  {p.name} <span className="muted num">· {p.kind === 'income' ? 'income' : 'bill'} · day {p.dayOfMonth}</span>
+                </span>
+                <span className={`setting-trail num ${p.kind === 'income' ? 'positive' : ''}`}>{signed(p.kind === 'income' ? p.amount : -p.amount)}</span>
+              </button>
+            ))}
+            {planned.map((p) => (
+              <button key={p.id} type="button" className="setting setting-button" onClick={() => openSheet({ kind: 'money-plan', plan: p })}>
+                <span className="truncate">
+                  {p.name} <span className="muted num">· {p.date && p.date < today ? `was ${formatShortDate(p.date)}` : p.date ? formatShortDate(p.date) : ''}</span>
+                </span>
+                <span className="setting-trail num">{signed(-p.amount)}</span>
+              </button>
+            ))}
+            {income > 0 && (
+              <div className="setting">
+                <span className="muted">Left after bills each month</span>
+                <span className="setting-trail num">{signed(income - bills)}</span>
+              </div>
+            )}
+          </div>
+        )}
+        <div className="chips plan-add">
+          <button type="button" className="chip" onClick={() => openSheet({ kind: 'money-plan', planKind: 'bill' })}>
+            + Bill
+          </button>
+          <button type="button" className="chip" onClick={() => openSheet({ kind: 'money-plan', planKind: 'income' })}>
+            + Income
+          </button>
+          <button type="button" className="chip" onClick={() => openSheet({ kind: 'money-plan', planKind: 'planned' })}>
+            + Planned spend
+          </button>
+        </div>
+      </section>
+    </>
   )
 }

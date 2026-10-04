@@ -48,6 +48,7 @@ const ORDER: SyncTable[] = [
   'analystRuns',
   'recommendations',
   'targets',
+  'moneyPlans',
 ]
 
 /** Facets the app can remove from an existing entry; absent → delete server row. */

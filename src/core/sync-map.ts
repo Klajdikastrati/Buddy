@@ -3,6 +3,7 @@
 import type {
   AnalystRun,
   Category,
+  MoneyPlan,
   DayCheckin,
   Entry,
   Exercise,
@@ -173,6 +174,7 @@ export const SPECS = {
   analystRuns: flat<AnalystRun>('analyst_runs'),
   recommendations: flat<Recommendation>('recommendations', ['currentValue', 'suggestedValue']),
   targets: flat<Target>('targets', ['value']),
+  moneyPlans: flat<MoneyPlan>('money_plans', ['amount', 'dayOfMonth']),
   items: { server: 'items', onConflict: 'id', toServer: itemToServer, fromServer: itemFromServer } as TableSpec<Item>,
 }
 

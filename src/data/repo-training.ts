@@ -110,6 +110,25 @@ export async function removeWorkoutExercise(entryId: ID, exerciseId: ID) {
   })
 }
 
+/**
+ * Do a different exercise instead (machine taken, felt off…): sets not yet
+ * ticked move to the new exercise, emptied; ticked sets stay with the old one.
+ */
+export async function swapWorkoutExercise(entryId: ID, fromId: ID, toId: ID) {
+  const t = now()
+  await db.transaction('rw', db.sets, db.outbox, async () => {
+    const sets = await liveSets(entryId)
+    const from = sets.filter((s) => s.exerciseId === fromId)
+    const keepsDone = from.some((s) => s.doneAt)
+    const order = keepsDone ? Math.max(-1, ...sets.map((s) => s.exerciseOrder)) + 1 : (from[0]?.exerciseOrder ?? 0)
+    let index = 0
+    for (const s of from) {
+      if (s.doneAt) continue
+      await put('sets', { ...s, exerciseId: toId, exerciseOrder: order, setIndex: index++, reps: null, weightKg: null, updatedAt: t })
+    }
+  })
+}
+
 /** End the workout: stamp the end, drop sets never ticked, leave Workout Mode. */
 export async function finishWorkout(entryId: ID) {
   const t = now()

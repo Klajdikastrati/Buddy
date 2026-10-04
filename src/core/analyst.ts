@@ -2,7 +2,7 @@
 // bad field rejects the whole file, with every problem listed, because
 // anything that can change a target must be exactly what Buddy expects.
 import { isTargetKey, targetDef } from './targets'
-import type { PlanKind, TargetKey } from './types'
+import type { MoneyPlanProposal, PlanKind, PlanProposal, RecommendationType, TargetKey, TemplateProposal, TrackerFieldType, TrackerProposal } from './types'
 
 export const ANALYSIS_SCHEMA_VERSION = '1'
 const LEVELS = ['observation', 'correlation', 'hypothesis', 'recommendation'] as const
@@ -49,7 +49,45 @@ export interface ProposedPlanItem {
   confidence: (typeof CONFIDENCE)[number]
 }
 
-export type ProposedChange = ProposedTarget | ProposedPlanItem
+/** A monthly bill / income (day_of_month) or a planned one-off spend (date), in the user's currency. */
+export interface ProposedMoneyPlan {
+  id: string
+  type: 'money_plan'
+  kind: MoneyPlanProposal['kind']
+  name: string
+  amount: number
+  currency: string
+  day_of_month: number | null
+  date: string | null
+  reason: string
+  confidence: (typeof CONFIDENCE)[number]
+}
+
+/** A custom tracker to create. */
+export interface ProposedTracker {
+  id: string
+  type: 'tracker'
+  name: string
+  fields: TrackerProposal['fields']
+  reason: string
+  confidence: (typeof CONFIDENCE)[number]
+}
+
+/** A workout template; exercises by name, created if missing. */
+export interface ProposedTemplate {
+  id: string
+  type: 'workout_template'
+  name: string
+  weekdays: number[]
+  exercises: TemplateProposal['exercises']
+  reason: string
+  confidence: (typeof CONFIDENCE)[number]
+}
+
+export type ProposedChange = ProposedTarget | ProposedPlanItem | ProposedMoneyPlan | ProposedTracker | ProposedTemplate
+export const PROPOSAL_TYPES = ['target', 'plan_item', 'money_plan', 'tracker', 'workout_template'] as const
+const MONEY_KINDS = ['bill', 'income', 'planned'] as const
+const FIELD_TYPES: readonly TrackerFieldType[] = ['number', 'text', 'bool']
 
 const PLAN_KINDS = ['goal', 'routine', 'task'] as const
 
@@ -206,9 +244,97 @@ export function validateAnalysis(doc: unknown, currency: string): ValidationResu
   const proposed: ProposedChange[] = []
   const seenKeys = new Set<string>()
   let planCount = 0
-  c.arr(doc, 'proposed_changes', '', 30).forEach((raw, i) => {
+  let setupCount = 0
+  const weekdaysOf = (raw: Obj, p: string): number[] | null => {
+    const w = raw.weekdays
+    if (!Array.isArray(w) || w.some((d) => !Number.isInteger(d) || d < 0 || d > 6) || new Set(w).size !== w.length) {
+      c.fail(`${p}.weekdays`, 'must be distinct weekdays 0–6 (0 = Sunday)')
+      return null
+    }
+    return [...(w as number[])].sort()
+  }
+  c.arr(doc, 'proposed_changes', '', 40).forEach((raw, i) => {
     const p = `proposed_changes[${i}]`
     if (!isObj(raw)) return c.fail(p, 'must be an object')
+    if (raw.type === 'money_plan' || raw.type === 'tracker' || raw.type === 'workout_template') {
+      if (++setupCount > 15) return c.fail(p, 'at most 15 money_plan / tracker / workout_template items per analysis')
+    }
+    if (raw.type === 'money_plan') {
+      c.keys(raw, p, ['id', 'type', 'kind', 'name', 'amount', 'currency', 'day_of_month', 'date', 'reason', 'confidence'])
+      const id = c.str(raw, 'id', p, { max: 200 })
+      const kind = c.oneOf(raw, 'kind', p, MONEY_KINDS)
+      const name = c.str(raw, 'name', p, { max: 80 })
+      const amount = c.num(raw, 'amount', p)
+      if (amount != null && (amount <= 0 || amount > 5_000_000)) c.fail(`${p}.amount`, 'must be more than 0 and at most 5000000')
+      if (raw.currency !== currency) c.fail(`${p}.currency`, `must be "${currency}" (convert amounts to the user's currency)`)
+      let day: number | null = null
+      let date: string | null = null
+      if (kind === 'planned') {
+        if (typeof raw.date !== 'string' || !validDate(raw.date)) c.fail(`${p}.date`, 'a planned spend needs a date YYYY-MM-DD')
+        else date = raw.date
+        if (raw.day_of_month !== undefined && raw.day_of_month !== null) c.fail(`${p}.day_of_month`, 'only bills and income repeat monthly')
+      } else if (kind) {
+        const d = raw.day_of_month
+        if (typeof d !== 'number' || !Number.isInteger(d) || d < 1 || d > 31) c.fail(`${p}.day_of_month`, 'bills and income need day_of_month 1–31')
+        else day = d
+        if (raw.date !== undefined && raw.date !== null) c.fail(`${p}.date`, 'only planned spends have a date')
+      }
+      const reason = c.str(raw, 'reason', p, { max: 1000 })
+      const confidence = c.oneOf(raw, 'confidence', p, CONFIDENCE)
+      if (id && kind && name && amount != null && reason && confidence && (day != null || date != null)) {
+        proposed.push({ id, type: 'money_plan', kind, name, amount, currency, day_of_month: day, date, reason, confidence })
+      }
+      return
+    }
+    if (raw.type === 'tracker') {
+      c.keys(raw, p, ['id', 'type', 'name', 'fields', 'reason', 'confidence'])
+      const id = c.str(raw, 'id', p, { max: 200 })
+      const name = c.str(raw, 'name', p, { max: 60 })
+      const fields: TrackerProposal['fields'] = []
+      const rawFields = c.arr(raw, 'fields', p, 8)
+      if (!rawFields.length) c.fail(`${p}.fields`, 'needs at least one field')
+      rawFields.forEach((f, j) => {
+        const fp = `${p}.fields[${j}]`
+        if (!isObj(f)) return c.fail(fp, 'must be an object')
+        c.keys(f, fp, ['label', 'type', 'unit'])
+        const label = c.str(f, 'label', fp, { max: 40 })
+        const type = c.oneOf(f, 'type', fp, FIELD_TYPES)
+        const unit = c.str(f, 'unit', fp, { max: 20, optional: true, nullable: true })
+        if (label && type) fields.push({ label, type, unit: type === 'number' ? unit : null })
+      })
+      const reason = c.str(raw, 'reason', p, { max: 1000 })
+      const confidence = c.oneOf(raw, 'confidence', p, CONFIDENCE)
+      if (id && name && fields.length && reason && confidence) proposed.push({ id, type: 'tracker', name, fields, reason, confidence })
+      return
+    }
+    if (raw.type === 'workout_template') {
+      c.keys(raw, p, ['id', 'type', 'name', 'weekdays', 'exercises', 'reason', 'confidence'])
+      const id = c.str(raw, 'id', p, { max: 200 })
+      const name = c.str(raw, 'name', p, { max: 60 })
+      const weekdays = weekdaysOf(raw, p)
+      const exercises: TemplateProposal['exercises'] = []
+      const rawEx = c.arr(raw, 'exercises', p, 15)
+      if (!rawEx.length) c.fail(`${p}.exercises`, 'needs at least one exercise')
+      rawEx.forEach((x, j) => {
+        const xp = `${p}.exercises[${j}]`
+        if (!isObj(x)) return c.fail(xp, 'must be an object')
+        c.keys(x, xp, ['name', 'sets', 'reps'])
+        const exName = c.str(x, 'name', xp, { max: 60 })
+        const sets = x.sets
+        if (typeof sets !== 'number' || !Number.isInteger(sets) || sets < 1 || sets > 10) c.fail(`${xp}.sets`, 'must be a whole number 1–10')
+        const reps = x.reps
+        if (reps !== undefined && reps !== null && (typeof reps !== 'number' || !Number.isInteger(reps) || reps < 1 || reps > 100)) {
+          c.fail(`${xp}.reps`, 'must be a whole number 1–100 or null')
+        }
+        if (exName && typeof sets === 'number') exercises.push({ name: exName, sets, reps: typeof reps === 'number' ? reps : null })
+      })
+      const reason = c.str(raw, 'reason', p, { max: 1000 })
+      const confidence = c.oneOf(raw, 'confidence', p, CONFIDENCE)
+      if (id && name && weekdays && exercises.length && reason && confidence) {
+        proposed.push({ id, type: 'workout_template', name, weekdays, exercises, reason, confidence })
+      }
+      return
+    }
     if (raw.type === 'plan_item') {
       c.keys(raw, p, ['id', 'type', 'kind', 'title', 'weekdays', 'week', 'date', 'reason', 'confidence'])
       if (++planCount > 10) return c.fail(p, 'at most 10 plan items per analysis')
@@ -242,7 +368,7 @@ export function validateAnalysis(doc: unknown, currency: string): ValidationResu
     c.keys(raw, p, ['id', 'type', 'target_key', 'current_value', 'suggested_value', 'unit', 'reason', 'confidence', 'review_after_days'])
     const id = c.str(raw, 'id', p, { max: 200 })
     if (raw.type !== 'target') {
-      c.fail(`${p}.type`, `"${String(raw.type)}" is not supported (only "target" or "plan_item")`)
+      c.fail(`${p}.type`, `"${String(raw.type)}" is not supported (one of ${PROPOSAL_TYPES.join(', ')})`)
       return
     }
     const key = raw.target_key
@@ -289,4 +415,32 @@ export function validateAnalysis(doc: unknown, currency: string): ValidationResu
 
   if (c.errors.length || !analysis) return { ok: false, errors: c.errors.length ? c.errors : ['analysis is missing'] }
   return { ok: true, value: { schema_version: '1', analysis, insights, recommendations, proposed_changes: proposed, warnings, questions } }
+}
+
+/** How a non-target proposal reads in Buddy: a heading, the thing itself, and when/what. */
+export function describeProposal(type: RecommendationType, details: unknown, currency: string, fmtMoney: (n: number, c: string) => string, fmtDate: (d: string) => string, fmtDays: (d: number[]) => string) {
+  if (type === 'plan_item') {
+    const d = details as PlanProposal
+    const label = d.kind === 'goal' ? 'Weekly goal' : d.kind === 'routine' ? 'Routine' : 'Task'
+    const when = d.kind === 'goal' ? (d.week === 'next' ? 'Next week' : 'This week') : d.kind === 'routine' ? fmtDays(d.weekdays) : d.date ? fmtDate(d.date) : 'Someday'
+    return { label, title: d.title, sub: when, action: 'Add to plan', done: 'Added to Plan' }
+  }
+  if (type === 'money_plan') {
+    const d = details as MoneyPlanProposal
+    const label = d.kind === 'income' ? 'Income' : d.kind === 'bill' ? 'Monthly bill' : 'Planned spend'
+    const when = d.kind === 'planned' && d.date ? fmtDate(d.date) : `every month, day ${d.dayOfMonth}`
+    return { label, title: d.name, sub: `${fmtMoney(d.amount, currency)} · ${when}`, action: 'Add to money plan', done: 'Added to money plan' }
+  }
+  if (type === 'tracker') {
+    const d = details as TrackerProposal
+    return { label: 'Tracker', title: d.name, sub: d.fields.map((f) => (f.unit ? `${f.label} (${f.unit})` : f.label)).join(' · '), action: 'Create tracker', done: 'Tracker created' }
+  }
+  const d = details as TemplateProposal
+  return {
+    label: 'Workout template',
+    title: d.name,
+    sub: `${d.weekdays.length ? `${fmtDays(d.weekdays)} · ` : ''}${d.exercises.map((x) => `${x.name} ${x.sets}×${x.reps ?? '–'}`).join(' · ')}`,
+    action: 'Create template',
+    done: 'Template created',
+  }
 }

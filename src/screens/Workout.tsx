@@ -12,6 +12,7 @@ import {
   finishWorkout,
   removeSet,
   removeWorkoutExercise,
+  swapWorkoutExercise,
   restoreWorkout,
   updateSet,
 } from '../data/repo-training'
@@ -154,7 +155,8 @@ async function loadSession(): Promise<Session | null> {
 function ActiveWorkout({ session, onFinish }: { session: Session; onFinish: (id: ID) => Promise<void> }) {
   const { entry, sets, exercises, template, history } = session
   const entryId = entry.id
-  const [picking, setPicking] = useState(false)
+  /** true = adding; an exercise id = swapping that one. */
+  const [picking, setPicking] = useState<boolean | ID>(false)
   const exerciseById = new Map(exercises.map((e) => [e.id, e]))
 
   const groups: Group[] = []
@@ -204,6 +206,7 @@ function ActiveWorkout({ session, onFinish }: { session: Session; onFinish: (id:
           group={g}
           prev={previousPerformance(g.exerciseId, entry.workout!.startedAt, history.workouts, history.sets)}
           template={template}
+          onSwap={() => setPicking(g.exerciseId)}
         />
       ))}
 
@@ -217,12 +220,14 @@ function ActiveWorkout({ session, onFinish }: { session: Session; onFinish: (id:
         Discard workout
       </button>
 
-      <Sheet open={picking} onClose={() => setPicking(false)} title="Add exercise">
-        {picking && (
+      <Sheet open={picking !== false} onClose={() => setPicking(false)} title={typeof picking === 'string' ? `Swap ${exerciseById.get(picking)?.name ?? 'exercise'}` : 'Add exercise'}>
+        {picking !== false && (
           <ExercisePicker
             exclude={groups.map((g) => g.exerciseId)}
             onPick={async (ex) => {
+              const swapping = picking
               setPicking(false)
+              if (typeof swapping === 'string') return swapWorkoutExercise(entryId, swapping, ex.id)
               const last = previousPerformance(ex.id, entry.workout!.startedAt, history.workouts, history.sets)
               await addWorkoutExercise(entryId, ex.id, last?.sets.length ?? 3)
             }}
@@ -239,12 +244,14 @@ function ExerciseCard({
   group,
   prev,
   template,
+  onSwap,
 }: {
   entry: Entry
   exercise?: Exercise
   group: Group
   prev: PreviousPerformance | null
   template: WorkoutTemplate | null
+  onSwap: () => void
 }) {
   const templateReps = template?.exercises.find((x) => x.exerciseId === group.exerciseId)?.reps ?? null
   const last = group.sets[group.sets.length - 1]
@@ -260,6 +267,9 @@ function ExerciseCard({
               : 'First time — no previous numbers'}
           </p>
         </div>
+        <button type="button" className="icon-btn" aria-label={`Swap ${exercise?.name ?? 'exercise'} for another`} onClick={onSwap}>
+          <Icon name="repeat" size={15} />
+        </button>
         <button
           type="button"
           className="icon-btn"

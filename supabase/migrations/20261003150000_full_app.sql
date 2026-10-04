@@ -251,12 +251,12 @@ create table public.recommendations (
   id uuid primary key,
   user_id uuid not null default auth.uid() references auth.users on delete cascade,
   run_id uuid not null references public.analyst_runs on delete cascade,
-  type text not null check (type in ('target', 'plan_item')),
+  type text not null check (type in ('target', 'plan_item', 'money_plan', 'tracker', 'workout_template')),
   target_key text,
   current_value numeric(14, 2),
   suggested_value numeric(14, 2),
   unit text,
-  details jsonb,                              -- plan_item: {kind, title, weekdays, week, date}
+  details jsonb,                              -- every non-target type: what to add (shape per type)
   reason text not null,
   confidence text not null check (confidence in ('low', 'medium', 'high')),
   status text not null default 'pending' check (status in ('pending', 'accepted', 'rejected', 'stale')),
@@ -267,7 +267,7 @@ create table public.recommendations (
   server_updated_at timestamptz not null default now(),
   check (
     (type = 'target' and target_key is not null and suggested_value is not null and unit is not null)
-    or (type = 'plan_item' and details is not null)
+    or (type <> 'target' and details is not null)
   )
 );
 create index recommendations_sync_idx on public.recommendations (user_id, server_updated_at);
@@ -289,6 +289,26 @@ create index entry_workout_sync_idx on public.entry_workout (user_id, server_upd
 create index entry_custom_sync_idx on public.entry_custom (user_id, server_updated_at);
 
 -- ---------------------------------------------------------------------------
+-- Money plan — expected income, fixed bills, planned spends, balance anchor
+-- ---------------------------------------------------------------------------
+create table public.money_plans (
+  id uuid primary key,
+  user_id uuid not null default auth.uid() references auth.users on delete cascade,
+  kind text not null check (kind in ('income', 'bill', 'planned', 'balance')),
+  name text not null check (length(name) between 1 and 80),
+  amount numeric(14, 2) not null,
+  day_of_month smallint check (day_of_month is null or day_of_month between 1 and 31),
+  date date,
+  category_id uuid references public.categories on delete set null,
+  archived boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz,
+  server_updated_at timestamptz not null default now()
+);
+create index money_plans_sync_idx on public.money_plans (user_id, server_updated_at);
+
+-- ---------------------------------------------------------------------------
 -- Triggers, RLS, grants
 -- ---------------------------------------------------------------------------
 do $$
@@ -298,7 +318,7 @@ begin
   foreach t in array array[
     'foods', 'entry_nutrition', 'entry_sleep', 'entry_measurement', 'entry_activity',
     'workout_templates', 'entry_workout', 'tracker_defs', 'entry_custom', 'exercises',
-    'workout_sets', 'day_checkins', 'plan_items', 'analyst_runs', 'recommendations'
+    'workout_sets', 'day_checkins', 'plan_items', 'analyst_runs', 'recommendations', 'money_plans'
   ] loop
     execute format(
       'create trigger %1$s_sync_guard before insert or update on public.%1$I

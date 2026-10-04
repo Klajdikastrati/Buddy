@@ -26,7 +26,8 @@ Rationale: `docs/history/PHASE0_AUDIT_AND_PROPOSAL.md` §9. Types: `src/core/typ
 | `plan` | `plan_items` | task / routine (`weekdays`, `doneDates`) / goal |
 | `trackers` | `tracker_defs` | fields JSONB; values in `entry_custom` |
 | `targets` | `targets` | |
-| `analystRuns`, `recommendations` | `analyst_runs`, `recommendations` | imported analyses + proposals |
+| `analystRuns`, `recommendations` | `analyst_runs`, `recommendations` | imported analyses + proposals (type target · plan_item · money_plan · tracker · workout_template; `details` jsonb for non-targets) |
+| `moneyPlans` | `money_plans` | money plan: monthly `income`/`bill` (day_of_month), `planned` one-off (date), `balance` anchors (newest wins; balance = anchor + money logged after it). Forecast in `core/forecast.ts` |
 | `meta.settings` | `profiles` | currency ALL, timezone, rollover hour |
 
 Every synced row: client UUID (or date key), `createdAt`, `updatedAt` (LWW), `deletedAt` (soft delete).

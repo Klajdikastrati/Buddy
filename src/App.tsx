@@ -9,6 +9,7 @@ import { ActivitySheet } from './features/ActivitySheet'
 import { CheckinSheet } from './features/CheckinSheet'
 import { FoodEditorSheet } from './features/FoodEditorSheet'
 import { FoodSheet } from './features/FoodSheet'
+import { MoneyPlanSheet, BalanceSheet } from './features/MoneyPlanSheet'
 import { PlanItemSheet } from './features/PlanItemSheet'
 import { MoneySheet } from './features/MoneySheet'
 import { QuickAddSheet } from './features/QuickAddSheet'
@@ -174,6 +175,8 @@ function Shell({ userId }: { userId: string }) {
       {sheet.kind === 'tracker-def' && <TrackerDefSheet key={sheet.def?.id ?? 'new'} def={sheet.def} />}
       {sheet.kind === 'tracker-log' && <TrackerLogSheet key={sheet.entry?.id ?? sheet.trackerId} trackerId={sheet.trackerId} entry={sheet.entry} />}
       {sheet.kind === 'analyst-export' && <ExportSheet />}
+      {sheet.kind === 'money-plan' && <MoneyPlanSheet key={sheet.plan?.id ?? 'new'} plan={sheet.plan} kind={sheet.planKind} />}
+      {sheet.kind === 'balance' && <BalanceSheet current={sheet.current} />}
       <Toaster />
     </div>
   )

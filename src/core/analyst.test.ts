@@ -71,7 +71,7 @@ describe('buddy-analysis v1 validation', () => {
     expect(r.ok).toBe(false)
     if (r.ok) return
     expect(r.errors).toEqual([
-      'proposed_changes[0].type: "delete_entries" is not supported (only "target" or "plan_item")',
+      'proposed_changes[0].type: "delete_entries" is not supported (one of target, plan_item, money_plan, tracker, workout_template)',
       'proposed_changes[1].target_key: "salary" is not a target Buddy lets the Analyst change',
       'proposed_changes[2].suggested_value: equals the current value',
       'proposed_changes[3].injected: unknown field',
@@ -122,6 +122,38 @@ describe('plan proposals', () => {
       'proposed_changes[0].weekdays: a routine needs distinct weekdays 0–6 (0 = Sunday)',
       'proposed_changes[1].week: a goal needs week "this" or "next"',
       'proposed_changes[2].kind: must be one of goal, routine, task',
+    ])
+  })
+})
+
+describe('setup proposals', () => {
+  const base = () => ({ ...valid(), proposed_changes: [] as unknown[] })
+  it('accepts money plan rows, trackers and workout templates', () => {
+    const doc = base()
+    doc.proposed_changes = [
+      { id: 'm1', type: 'money_plan', kind: 'bill', name: 'Phone', amount: 12000, currency: 'ALL', day_of_month: 15, date: null, reason: 'Fixed cost', confidence: 'high' },
+      { id: 'm2', type: 'money_plan', kind: 'planned', name: 'Prague trip', amount: 41000, currency: 'ALL', date: '2026-10-22', reason: 'Trip', confidence: 'medium' },
+      { id: 'k1', type: 'tracker', name: 'Cigarettes', fields: [{ label: 'Cigarettes', type: 'number', unit: 'cig' }], reason: 'Count to cut down', confidence: 'high' },
+      { id: 'w1', type: 'workout_template', name: 'Full body A', weekdays: [1], exercises: [{ name: 'Squat', sets: 3, reps: 8 }, { name: 'Lat pulldown', sets: 3, reps: null }], reason: 'Back to the gym', confidence: 'medium' },
+    ]
+    const r = validateAnalysis(doc, 'ALL')
+    expect(r.ok && r.value.proposed_changes.map((p) => p.type)).toEqual(['money_plan', 'money_plan', 'tracker', 'workout_template'])
+  })
+
+  it('rejects wrong currency, missing schedule, empty fields and bad sets', () => {
+    const doc = base()
+    doc.proposed_changes = [
+      { id: 'm1', type: 'money_plan', kind: 'income', name: 'Salary', amount: 600, currency: 'EUR', day_of_month: 10, reason: 'r', confidence: 'high' },
+      { id: 'm2', type: 'money_plan', kind: 'bill', name: 'Wifi', amount: 3800, currency: 'ALL', reason: 'r', confidence: 'high' },
+      { id: 'k1', type: 'tracker', name: 'Cigarettes', fields: [], reason: 'r', confidence: 'high' },
+      { id: 'w1', type: 'workout_template', name: 'A', weekdays: [], exercises: [{ name: 'Squat', sets: 0 }], reason: 'r', confidence: 'low' },
+    ]
+    const r = validateAnalysis(doc, 'ALL')
+    expect(!r.ok && r.errors).toEqual([
+      'proposed_changes[0].currency: must be "ALL" (convert amounts to the user\'s currency)',
+      'proposed_changes[1].day_of_month: bills and income need day_of_month 1–31',
+      'proposed_changes[2].fields: needs at least one field',
+      'proposed_changes[3].exercises[0].sets: must be a whole number 1–10',
     ])
   })
 })

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { FoodDraft } from '../core/nutrition'
-import type { Entry, EntryKind, Food, ID, LocalDate, PlanItem, PlanKind, TrackerDef, WorkoutTemplate } from '../core/types'
+import type { Entry, EntryKind, Food, ID, LocalDate, MoneyPlan, PlanItem, PlanKind, TrackerDef, WorkoutTemplate } from '../core/types'
 
 /** Which sheet is open, app-wide. Kept outside React so any screen can open one. */
 export type SheetState =
@@ -24,6 +24,8 @@ export type SheetState =
   | { kind: 'tracker-def'; def?: TrackerDef }
   | { kind: 'tracker-log'; trackerId: ID; entry?: Entry }
   | { kind: 'analyst-export' }
+  | { kind: 'money-plan'; plan?: MoneyPlan; planKind?: 'income' | 'bill' | 'planned' }
+  | { kind: 'balance'; current: number | null }
 
 let state: SheetState = { kind: 'none' }
 /** The open sheet is animating out; it unmounts when `finishClose` runs. */

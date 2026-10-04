@@ -272,21 +272,64 @@ export interface PlanProposal {
   date: LocalDate | null
 }
 
-/** One proposed change from an imported analysis: a target value, or a plan item to add. */
+/** A money-plan row the Analyst suggests (never a balance — only the user knows that). */
+export interface MoneyPlanProposal {
+  kind: Exclude<MoneyPlanKind, 'balance'>
+  name: string
+  amount: number
+  dayOfMonth: number | null
+  date: LocalDate | null
+}
+
+/** A custom tracker to create (e.g. cigarettes: one number field). */
+export interface TrackerProposal {
+  name: string
+  fields: { label: string; type: TrackerFieldType; unit: string | null }[]
+}
+
+/** A workout template; exercises by name — missing ones are created when applied. */
+export interface TemplateProposal {
+  name: string
+  weekdays: number[]
+  exercises: { name: string; sets: number; reps: number | null }[]
+}
+
+export type RecommendationType = 'target' | 'plan_item' | 'money_plan' | 'tracker' | 'workout_template'
+
+/** One proposed change from an imported analysis: a target value, or something to add. */
 export interface Recommendation extends Synced {
   runId: ID
-  type: 'target' | 'plan_item'
+  type: RecommendationType
   /** type 'target' only. */
   targetKey: TargetKey | null
   currentValue: number | null
   suggestedValue: number | null
   unit: string | null
-  /** type 'plan_item' only. */
-  details: PlanProposal | null
+  /** Every type but 'target': what to add, shaped by `type`. */
+  details: PlanProposal | MoneyPlanProposal | TrackerProposal | TemplateProposal | null
   reason: string
   confidence: 'low' | 'medium' | 'high'
   status: 'pending' | 'accepted' | 'rejected' | 'stale'
   decidedAt: Instant | null
+}
+
+/**
+ * The money plan: expected income and fixed bills (monthly, on a day of the
+ * month), planned one-off spends (on a date), and the balance anchor ("I have
+ * X now"). Forecasts start from the latest balance row.
+ */
+export type MoneyPlanKind = 'income' | 'bill' | 'planned' | 'balance'
+
+export interface MoneyPlan extends Synced {
+  kind: MoneyPlanKind
+  name: string
+  amount: number
+  /** income / bill: day of the month it lands (1–31; clamped to short months). */
+  dayOfMonth: number | null
+  /** planned: the day of the spend. balance: the day it was set. */
+  date: LocalDate | null
+  categoryId: ID | null
+  archived: boolean
 }
 
 export interface Settings {

@@ -1,11 +1,16 @@
 import type { Analysis } from '../core/analyst'
 import { targetOn } from '../core/targets'
 import { addDays, weekStart } from '../core/dates'
-import type { AnalystRun, LocalDate, PlanProposal, Recommendation, Synced } from '../core/types'
+import { normalizeName } from '../core/recents'
+import type { AnalystRun, LocalDate, MoneyPlanProposal, PlanProposal, Recommendation, Synced, TemplateProposal, TrackerProposal } from '../core/types'
+import { slugKey } from '../core/numbers'
 import { db } from './db'
 import { created, now, patch, put } from './repo-base'
 import { setTarget } from './repo'
+import { addMoneyPlan, updateMoneyPlan } from './repo-money'
 import { addPlanItem } from './repo-plan'
+import { saveTracker } from './repo-trackers'
+import { addExercise, saveTemplate } from './repo-training'
 
 export type RunInput = Omit<AnalystRun, keyof Synced | 'importedAt'>
 export type ProposalInput = Pick<
@@ -49,8 +54,12 @@ export async function importAnalystRun(run: RunInput, proposals: ProposalInput[]
  * Re-checks the live value first; if it moved meanwhile, the proposal goes stale instead.
  */
 export async function applyRecommendation(rec: Recommendation, today: LocalDate): Promise<'applied' | 'stale'> {
-  if (rec.type === 'plan_item' && rec.details) {
-    await addPlanItem(planInput(rec.details, today))
+  if (rec.type !== 'target') {
+    if (!rec.details) return 'stale'
+    if (rec.type === 'plan_item') await addPlanItem(planInput(rec.details as PlanProposal, today))
+    else if (rec.type === 'money_plan') await applyMoneyPlan(rec.details as MoneyPlanProposal)
+    else if (rec.type === 'tracker') await applyTracker(rec.details as TrackerProposal)
+    else await applyTemplate(rec.details as TemplateProposal)
     await patch('recommendations', rec, { status: 'accepted', decidedAt: now() })
     return 'applied'
   }
@@ -89,20 +98,29 @@ export async function importAnalysis(a: Analysis, today: LocalDate): Promise<{ r
       model: a.analysis.model,
       payload: a,
     },
-    a.proposed_changes.map((p) =>
-      p.type === 'plan_item'
-        ? {
-            type: 'plan_item' as const,
-            targetKey: null,
-            currentValue: null,
-            suggestedValue: null,
-            unit: null,
-            details: { kind: p.kind, title: p.title, weekdays: p.weekdays, week: p.week, date: p.date },
-            reason: p.reason,
-            confidence: p.confidence,
-          }
-        : {
-            type: 'target' as const,
+    a.proposed_changes.map((p): ProposalInput => {
+      const add = (details: Recommendation['details']): ProposalInput => ({
+        type: p.type,
+        targetKey: null,
+        currentValue: null,
+        suggestedValue: null,
+        unit: null,
+        details,
+        reason: p.reason,
+        confidence: p.confidence,
+      })
+      switch (p.type) {
+        case 'plan_item':
+          return add({ kind: p.kind, title: p.title, weekdays: p.weekdays, week: p.week, date: p.date })
+        case 'money_plan':
+          return add({ kind: p.kind, name: p.name, amount: p.amount, dayOfMonth: p.day_of_month, date: p.date })
+        case 'tracker':
+          return add({ name: p.name, fields: p.fields })
+        case 'workout_template':
+          return add({ name: p.name, weekdays: p.weekdays, exercises: p.exercises })
+        case 'target':
+          return {
+            type: 'target',
             targetKey: p.target_key,
             currentValue: p.current_value,
             suggestedValue: p.suggested_value,
@@ -110,8 +128,9 @@ export async function importAnalysis(a: Analysis, today: LocalDate): Promise<{ r
             details: null,
             reason: p.reason,
             confidence: p.confidence,
-          },
-    ),
+          }
+      }
+    }),
     today,
   )
   return { run, proposals: a.proposed_changes.length }
@@ -134,4 +153,36 @@ export function planInput(d: PlanProposal, today: LocalDate) {
               : null
           : null,
   }
+}
+
+/** A tracker with the same name already there is left alone (no duplicates). */
+async function applyTracker(d: TrackerProposal) {
+  const existing = (await db.trackers.toArray()).find((t) => !t.deletedAt && normalizeName(t.name) === normalizeName(d.name))
+  if (existing) return
+  const keys: string[] = []
+  const fields = d.fields.map((f) => {
+    const key = slugKey(f.label, keys)
+    keys.push(key)
+    return { key, label: f.label, type: f.type, unit: f.unit }
+  })
+  await saveTracker({ name: d.name, fields })
+}
+
+/** Exercises are matched by name; ones Buddy doesn't know are created. */
+async function applyTemplate(d: TemplateProposal) {
+  const library = (await db.exercises.toArray()).filter((e) => !e.deletedAt)
+  const exercises = []
+  for (const x of d.exercises) {
+    const found = library.find((e) => normalizeName(e.name) === normalizeName(x.name)) ?? (await addExercise(x.name, null))
+    if (!library.includes(found)) library.push(found)
+    exercises.push({ exerciseId: found.id, sets: x.sets, reps: x.reps })
+  }
+  await saveTemplate({ name: d.name, weekdays: d.weekdays, exercises })
+}
+
+/** Same name and kind already in the money plan → update it rather than add a twin. */
+async function applyMoneyPlan(d: MoneyPlanProposal) {
+  const existing = (await db.moneyPlans.toArray()).find((p) => !p.deletedAt && !p.archived && p.kind === d.kind && normalizeName(p.name) === normalizeName(d.name))
+  if (existing) await updateMoneyPlan(existing, d)
+  else await addMoneyPlan({ ...d, categoryId: null })
 }

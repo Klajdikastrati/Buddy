@@ -1,7 +1,8 @@
 import { useLiveQuery } from '../ui/live'
 import { useRef, useState } from 'react'
-import { validateAnalysis, type Analysis, type ProposedTarget } from '../core/analyst'
+import { describeProposal, validateAnalysis, type Analysis, type ProposedTarget } from '../core/analyst'
 import { formatShortDate, formatWeekdays } from '../core/dates'
+import { formatMoney } from '../core/money'
 import { formatTarget, targetDef, targetOn } from '../core/targets'
 import type { AnalystRun, Recommendation, TargetKey } from '../core/types'
 import { db } from '../data/db'
@@ -31,6 +32,7 @@ export function MeAnalyst() {
   const live = (key: string) => targetOn(targets, key as TargetKey, today)
   const fmt = (key: string | null, v: number | null) => (v == null || key == null ? 'none' : formatTarget(key as TargetKey, v, cur))
   const label = (r: Recommendation) => (r.targetKey ? targetDef(r.targetKey).label : 'Target')
+  const describe = (r: Recommendation) => describeProposal(r.type, r.details, cur, formatMoney, formatShortDate, formatWeekdays)
   const runById = new Map(runs.map((r) => [r.id, r]))
   const open_ = recs.filter((r) => !r.decidedAt && (r.status === 'pending' || r.status === 'stale')).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const decided = recs.filter((r) => r.decidedAt).sort((a, b) => b.decidedAt!.localeCompare(a.decidedAt!))
@@ -54,7 +56,7 @@ export function MeAnalyst() {
   async function apply(rec: Recommendation) {
     const outcome = await applyRecommendation(rec, today)
     if (outcome === 'stale') return toast('Your target changed since this analysis — proposal marked stale.')
-    if (rec.type === 'plan_item') toast(`Added to Plan: ${rec.details?.title ?? ''}`)
+    if (rec.type !== 'target') toast(`${describe(rec).done}: ${describe(rec).title}`)
     else toast(`${label(rec)} is now ${fmt(rec.targetKey, rec.suggestedValue)} from today`)
   }
 
@@ -113,7 +115,7 @@ export function MeAnalyst() {
         {open_.length ? (
           <div className="stack">
             {open_.map((r) => {
-              if (r.type === 'plan_item' && r.details) return <PlanProposalCard key={r.id} rec={r} onApply={() => void apply(r)} />
+              if (r.type !== 'target' && r.details) return <AddProposalCard key={r.id} rec={r} info={describe(r)} onApply={() => void apply(r)} />
               const now = live(r.targetKey ?? '')
               const stale = r.status === 'stale' || !isCurrent(r, now)
               const run = runById.get(r.runId)
@@ -174,18 +176,18 @@ export function MeAnalyst() {
               <li key={r.id} className="list-row">
                 <span className="row-main static">
                   <span className="row-title num">
-                    {r.type === 'plan_item' && r.details
-                      ? `${PLAN_LABEL[r.details.kind]} · ${r.details.title}`
+                    {r.type !== 'target' && r.details
+                      ? `${describe(r).label} · ${describe(r).title}`
                       : `${label(r)} · ${fmt(r.targetKey, r.currentValue)} → ${fmt(r.targetKey, r.suggestedValue)}`}
                   </span>
                   <span className="row-sub">
                     {r.status === 'accepted'
-                      ? r.type === 'plan_item'
-                        ? 'Added to Plan'
+                      ? r.type !== 'target' && r.details
+                        ? describe(r).done
                         : 'Applied'
                       : r.status === 'stale'
                         ? 'Out of date — dismissed'
-                        : r.type === 'plan_item'
+                        : r.type !== 'target'
                           ? 'Skipped'
                           : 'Kept current'}
                     {r.decidedAt ? ` · ${formatShortDate(r.decidedAt.slice(0, 10))}` : ''}
@@ -294,35 +296,34 @@ function RunCard({ run, open, onToggle }: { run: AnalystRun; open: boolean; onTo
   )
 }
 
-const PLAN_LABEL = { goal: 'Weekly goal', routine: 'Routine', task: 'Task' } as const
-
-function whenText(d: NonNullable<Recommendation['details']>): string {
-  if (d.kind === 'goal') return d.week === 'next' ? 'Next week' : 'This week'
-  if (d.kind === 'routine') return formatWeekdays(d.weekdays)
-  return d.date ? formatShortDate(d.date) : 'Someday'
+const CARD: Record<string, { icon: 'plan' | 'money' | 'tracker' | 'workout'; tint: string; color: string }> = {
+  plan_item: { icon: 'plan', tint: DOMAIN.plan.tint, color: 'var(--c-plan)' },
+  money_plan: { icon: 'money', tint: DOMAIN.money.tint, color: 'var(--c-money)' },
+  tracker: { icon: 'tracker', tint: DOMAIN.analyst.tint, color: 'var(--c-analyst)' },
+  workout_template: { icon: 'workout', tint: DOMAIN.workout.tint, color: 'var(--c-workout)' },
 }
 
-/** A plan item the Analyst suggests: add it to Plan, or skip. */
-function PlanProposalCard({ rec, onApply }: { rec: Recommendation; onApply: () => void }) {
-  const d = rec.details!
+/** Something the Analyst suggests adding (plan item, money plan row, tracker, template): add it, or skip. */
+function AddProposalCard({ rec, info, onApply }: { rec: Recommendation; info: ReturnType<typeof describeProposal>; onApply: () => void }) {
+  const look = CARD[rec.type] ?? CARD.plan_item
   return (
     <article className="proposal">
       <div className="card-head">
-        <IconChip name={d.kind === 'routine' ? 'repeat' : d.kind === 'goal' ? 'flag' : 'plan'} tint={DOMAIN.plan.tint} size="sm" />
-        <h3 className="block-label" style={{ color: 'var(--c-plan)' }}>
-          {PLAN_LABEL[d.kind]}
+        <IconChip name={look.icon} tint={look.tint} size="sm" />
+        <h3 className="block-label" style={{ color: look.color }}>
+          {info.label}
         </h3>
         <span className={`pill pill-${rec.confidence}`}>{rec.confidence} confidence</span>
       </div>
-      <p className="proposal-title">{d.title}</p>
-      <p className="row-sub num">{whenText(d)}</p>
+      <p className="proposal-title">{info.title}</p>
+      <p className="row-sub num">{info.sub}</p>
       <p className="proposal-reason">{rec.reason}</p>
       <div className="pair">
         <button type="button" className="btn btn-quiet" onClick={() => void keepCurrent(rec).then(() => toast('Skipped'))}>
           Skip
         </button>
         <button type="button" className="btn btn-primary" onClick={onApply}>
-          Add to plan
+          {info.action}
         </button>
       </div>
     </article>

@@ -32,8 +32,11 @@ Single user in Albania (currency Lek/ALL, timezone Europe/Tirane, days start at 
 - **Today**: tiles for Calories (vs target, protein/carbs/fat), Money (spent today, budget left, per day), Sleep,
   Weight, Activity, Workout; up to 3 priorities from Plan; evening check-in (mood, energy, stress, productivity).
   Tapping a tile opens its detail screen.
+- **Money dashboard** (tap the Money tile): balance now (the user sets it; logging moves it), what's free per day
+  until payday, a balance-ahead line, upcoming bills/income/planned spends, and the money plan itself.
 - **Training**: workout templates with planned weekdays (Me → Training), Workout Mode shows last time's numbers,
-  PRs by heaviest weight and estimated 1RM.
+  PRs by heaviest weight and estimated 1RM. Templates are a starting point: in a workout the user can swap, add
+  or remove exercises freely — don't treat a deviation as failure.
 - **Plan**: tasks (today / a day / someday, carried over if missed), routines (weekdays, ticked per day), weekly
   goals.
 - **History**: Days, Trends (last 30 days vs previous 30), Signals (correlations, n ≥ 14).
@@ -60,7 +63,9 @@ Single user in Albania (currency Lek/ALL, timezone Europe/Tirane, days start at 
 `interventions`, `daily` (one row per day: spend, income, kcal, protein_g, caffeine_mg, food_entries,
 food_incomplete, sleep_min, sleep_quality, weight_kg, activity_min, km, steps, workouts, volume_kg, mood, energy,
 stress, productivity, trackers), `entries`, `foods_used`, `workouts` (with sets), `exercises`, `checkins`,
-`trackers`, `data_quality`, `signals` (Pearson r, n, 95% CI, ready flag), `analysis_contract`.
+`trackers`, `workout_templates`, `money_plan` (`plans` + `forecast`: balance, everyday spend/day, next payday, free
+per day until payday, projected at payday, upcoming), `data_quality`, `signals` (Pearson r, n, 95% CI, ready
+flag), `analysis_contract`.
 `null` always means "not logged / unknown", never zero.
 
 ## Output: `buddy-analysis.json` (schema_version "1")
@@ -91,7 +96,13 @@ the user pastes errors back, fix exactly those). No extra fields anywhere.
     { "id": "p3", "type": "plan_item", "kind": "routine", "title": "Lights out by 23:30", "weekdays": [1,2,3,4,5],
       "reason": "…", "confidence": "medium" },
     { "id": "p4", "type": "plan_item", "kind": "task", "title": "Set up a lunch recipe", "date": null,
-      "reason": "…", "confidence": "low" }
+      "reason": "…", "confidence": "low" },
+    { "id": "p5", "type": "money_plan", "kind": "bill", "name": "Phone", "amount": 12000, "currency": "ALL",
+      "day_of_month": 15, "date": null, "reason": "…", "confidence": "high" },
+    { "id": "p6", "type": "tracker", "name": "Cigarettes",
+      "fields": [{ "label": "Cigarettes", "type": "number", "unit": "cig" }], "reason": "…", "confidence": "high" },
+    { "id": "p7", "type": "workout_template", "name": "Full body A", "weekdays": [1],
+      "exercises": [{ "name": "Squat", "sets": 3, "reps": 8 }], "reason": "…", "confidence": "medium" }
   ],
   "warnings": ["data-quality or safety caveats"],
   "questions": ["things to ask the user next time"]
@@ -107,6 +118,16 @@ Rules for `proposed_changes`:
 - **plan_item** — `kind` goal | routine | task; `title` ≤120 chars. Goal needs `week`: "this" | "next". Routine
   needs `weekdays`: distinct 0–6 (0 = Sunday, so Mon–Fri is [1,2,3,4,5]). Task takes `date` (YYYY-MM-DD) or null for
   someday. At most 10 plan items per file.
+- **money_plan** — `kind` bill | income | planned; `name` ≤80; `amount` > 0 in the user's currency (`currency` must
+  equal it — convert EUR first and say the rate you used). Bill/income need `day_of_month` 1–31 (monthly) and
+  `date` null; planned needs `date`. Never propose a balance — ask the user and let them set it. A row with the same
+  kind and name updates the existing one.
+- **tracker** — `name` ≤60, `fields` 1–8 of `{label ≤40, type number|text|bool, unit (number only) or null}`.
+  Skipped if a tracker with that name exists.
+- **workout_template** — `name` ≤60, `weekdays` (may be empty), `exercises` 1–15 of `{name, sets 1–10, reps 1–100
+  or null}`. Names match the library case-insensitively (see `exercises` / `workout_templates`); unknown names are
+  created, so use common names ("Bench Press", "Lat Pulldown").
+- At most 15 money_plan + tracker + workout_template items per file.
 - Every change needs a `reason` the user can read in one glance, and a `confidence`.
 
 ## Setting it up on the iPhone

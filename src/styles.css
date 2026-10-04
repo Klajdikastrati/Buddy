@@ -2688,3 +2688,17 @@ section > .label-row {
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+
+/* ---- Money planner ---- */
+.negative {
+  color: var(--danger);
+}
+
+.plan-add {
+  margin-top: 8px;
+}
+
+button.block .btn {
+  align-self: flex-start;
+  margin-top: 8px;
+}

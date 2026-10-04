@@ -2,6 +2,7 @@
 // Pure: the caller loads rows; this shapes them. snake_case because it's an
 // external contract. null always means "not logged / unknown", never zero.
 import { daysBetween } from './dates'
+import { forecast } from './forecast'
 import { dailySeries, type DayRow } from './series'
 import { correlations, MIN_N, weekdayWeekend } from './signals'
 import { TARGET_DEFS, targetHistory, targetOn } from './targets'
@@ -13,6 +14,7 @@ import {
   type Exercise,
   type Food,
   type LocalDate,
+  type MoneyPlan,
   type Nutrients,
   type Recommendation,
   type Settings,
@@ -41,6 +43,8 @@ export interface ExportInput {
   recommendations: Recommendation[]
   /** First day money was ever logged (spend is 0, not unknown, from then). */
   moneySince: LocalDate | null
+  /** The money plan (bills, income, planned spends, balance anchors). */
+  moneyPlans?: MoneyPlan[]
 }
 
 const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
@@ -199,6 +203,10 @@ export function buildExport(input: ExportInput) {
     exercises: input.exercises.filter((e) => usedExerciseIds.has(e.id)).map((e) => ({ id: e.id, name: e.name, muscle: e.muscle })),
     checkins: checkins.map((c) => ({ date: c.localDate, mood: c.mood, energy: c.energy, stress: c.stress, productivity: c.productivity, note: c.note })),
     trackers: input.trackers.filter((t) => !t.deletedAt).map((t) => ({ id: t.id, name: t.name, fields: t.fields })),
+    workout_templates: input.templates
+      .filter((t) => !t.deletedAt && !t.archived)
+      .map((t) => ({ name: t.name, weekdays: t.weekdays, exercises: t.exercises.map((x) => ({ name: exerciseName.get(x.exerciseId) ?? x.exerciseId, sets: x.sets, reps: x.reps })) })),
+    money_plan: moneyPlan(input),
     data_quality: {
       days_in_period: rows.length,
       days_with_any_log: rows.filter((r) => r.logged).length,
@@ -224,7 +232,7 @@ export function buildExport(input: ExportInput) {
     analysis_contract: {
       file: 'buddy-analysis.json',
       schema_version: '1',
-      proposed_change_types: ['target', 'plan_item'],
+      proposed_change_types: ['target', 'plan_item', 'money_plan', 'tracker', 'workout_template'],
       target_keys: bounds,
       rule: 'current_value must equal targets.current[key].value (or null if unset); proposals outside bounds are rejected',
       plan_item: {
@@ -234,6 +242,41 @@ export function buildExport(input: ExportInput) {
         task: 'date: "YYYY-MM-DD" or null (someday)',
         limit: 'at most 10 plan items per analysis; each is added only if the user taps "Add to plan"',
       },
+      money_plan: {
+        fields: 'id, type:"money_plan", kind: bill|income|planned, name (≤80), amount (>0), currency (must equal profile currency — convert first), reason, confidence',
+        bill_income: 'day_of_month: 1–31 (repeats monthly; short months use their last day), date: null',
+        planned: 'date: "YYYY-MM-DD", day_of_month: null',
+        note: 'never a balance — the user sets that themselves; check money_plan.plans first to avoid duplicates',
+      },
+      tracker: {
+        fields: 'id, type:"tracker", name (≤60), fields: [{ label (≤40), type: number|text|bool, unit (number only) or null }] (1–8), reason, confidence',
+        note: 'skipped if a tracker with the same name exists',
+      },
+      workout_template: {
+        fields: 'id, type:"workout_template", name (≤60), weekdays [0..6] (may be empty), exercises: [{ name, sets 1–10, reps 1–100 or null }] (1–15), reason, confidence',
+        note: 'exercises are matched by name to the library (case-insensitive); unknown names are created',
+      },
+      limit_setup: 'at most 15 money_plan + tracker + workout_template items per analysis',
+    },
+  }
+}
+
+/** The money plan as the Analyst sees it: the rows plus Buddy's own forecast from them. */
+function moneyPlan(input: ExportInput) {
+  const plans = (input.moneyPlans ?? []).filter((p) => !p.deletedAt)
+  const f = forecast(input.entries, plans, input.to)
+  return {
+    plans: plans
+      .filter((p) => p.kind !== 'balance' && !p.archived)
+      .map((p) => ({ kind: p.kind, name: p.name, amount: p.amount, day_of_month: p.dayOfMonth, date: p.date })),
+    forecast: {
+      balance: f.balance,
+      balance_set_on: f.balanceSetOn,
+      everyday_spend_per_day: f.everydayPerDay == null ? null : Math.round(f.everydayPerDay),
+      next_payday: f.nextPayday,
+      free_per_day_until_payday: f.safePerDay == null ? null : Math.round(f.safePerDay),
+      projected_at_payday: f.projectedBeforePayday == null ? null : Math.round(f.projectedBeforePayday),
+      upcoming: f.upcoming.map((e) => ({ date: e.date, name: e.name, amount: e.amount, kind: e.kind })),
     },
   }
 }

@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie'
 import type {
   AnalystRun,
   Category,
+  MoneyPlan,
   DayCheckin,
   Entry,
   Exercise,
@@ -32,6 +33,7 @@ export type SyncTable =
   | 'analystRuns'
   | 'recommendations'
   | 'targets'
+  | 'moneyPlans'
 
 /** A pending upload. Rows are upserted whole by key, so replaying is safe. */
 export interface OutboxOp {
@@ -64,6 +66,7 @@ export const db = new Dexie('buddy') as Dexie & {
   trackers: EntityTable<TrackerDef, 'id'>
   analystRuns: EntityTable<AnalystRun, 'id'>
   recommendations: EntityTable<Recommendation, 'id'>
+  moneyPlans: EntityTable<MoneyPlan, 'id'>
   outbox: EntityTable<OutboxOp, 'seq'>
   meta: EntityTable<Meta, 'key'>
 }
@@ -88,6 +91,10 @@ db.version(2).stores({
   trackers: 'id, updatedAt',
   analystRuns: 'id, updatedAt',
   recommendations: 'id, runId, status, updatedAt',
+})
+
+db.version(3).stores({
+  moneyPlans: 'id, kind, updatedAt',
 })
 
 export const DEFAULT_SETTINGS: Settings = {
