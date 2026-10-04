@@ -111,7 +111,7 @@ export async function importAnalysis(a: Analysis, today: LocalDate): Promise<{ r
       })
       switch (p.type) {
         case 'plan_item':
-          return add({ kind: p.kind, title: p.title, weekdays: p.weekdays, week: p.week, date: p.date })
+          return add({ kind: p.kind, title: p.title, weekdays: p.weekdays, week: p.week, date: p.date, timesPerDay: p.times_per_day, partOfDay: p.part_of_day, cue: p.cue })
         case 'money_plan':
           return add({ kind: p.kind, name: p.name, amount: p.amount, dayOfMonth: p.day_of_month, date: p.date })
         case 'tracker':
@@ -142,6 +142,7 @@ export function planInput(d: PlanProposal, today: LocalDate) {
     kind: d.kind,
     title: d.title,
     weekdays: d.kind === 'routine' ? d.weekdays : [],
+    ...(d.kind === 'routine' ? { timesPerDay: d.timesPerDay ?? 1, partOfDay: d.partOfDay ?? 'anytime', cue: d.cue ?? null } : {}),
     localDate:
       d.kind === 'goal'
         ? addDays(weekStart(today), d.week === 'next' ? 7 : 0)

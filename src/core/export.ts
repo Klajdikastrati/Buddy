@@ -1,7 +1,8 @@
 // buddy-export v1 — the read-only hand-off to Buddy Analyst (docs/history §13).
 // Pure: the caller loads rows; this shapes them. snake_case because it's an
 // external contract. null always means "not logged / unknown", never zero.
-import { daysBetween } from './dates'
+import { addDays, daysBetween, weekdayOf } from './dates'
+import { countOn, partOf, timesOf } from './habits'
 import { forecast } from './forecast'
 import { dailySeries, type DayRow } from './series'
 import { correlations, MIN_N, weekdayWeekend } from './signals'
@@ -15,6 +16,7 @@ import {
   type Food,
   type LocalDate,
   type MoneyPlan,
+  type PlanItem,
   type Nutrients,
   type Recommendation,
   type Settings,
@@ -45,6 +47,8 @@ export interface ExportInput {
   moneySince: LocalDate | null
   /** The money plan (bills, income, planned spends, balance anchors). */
   moneyPlans?: MoneyPlan[]
+  /** Plan items — habits (routines) are exported with their record. */
+  plan?: PlanItem[]
 }
 
 const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)
@@ -207,6 +211,7 @@ export function buildExport(input: ExportInput) {
       .filter((t) => !t.deletedAt && !t.archived)
       .map((t) => ({ name: t.name, weekdays: t.weekdays, exercises: t.exercises.map((x) => ({ name: exerciseName.get(x.exerciseId) ?? x.exerciseId, sets: x.sets, reps: x.reps })) })),
     money_plan: moneyPlan(input),
+    habits: habitsExport(input),
     data_quality: {
       days_in_period: rows.length,
       days_with_any_log: rows.filter((r) => r.logged).length,
@@ -240,6 +245,7 @@ export function buildExport(input: ExportInput) {
         goal: 'week: "this" | "next"',
         routine: 'weekdays: [0..6], 0 = Sunday, at least one',
         task: 'date: "YYYY-MM-DD" or null (someday)',
+        habit: 'a routine is shown to the user as a habit; optional times_per_day 1–10 (brush teeth = 2), part_of_day morning|afternoon|evening|anytime, cue ≤120 chars completing "right after I …" (e.g. "wake up")',
         limit: 'at most 10 plan items per analysis; each is added only if the user taps "Add to plan"',
       },
       money_plan: {
@@ -259,6 +265,30 @@ export function buildExport(input: ExportInput) {
       limit_setup: 'at most 15 money_plan + tracker + workout_template items per analysis',
     },
   }
+}
+
+/** Habits with their record over the export period: done days vs scheduled days, and counts per day. */
+function habitsExport(input: ExportInput) {
+  const days: LocalDate[] = []
+  for (let d = input.from; d <= input.to; d = addDays(d, 1)) days.push(d)
+  return (input.plan ?? [])
+    .filter((h) => h.kind === 'routine' && !h.deletedAt && !h.archived)
+    .map((h) => {
+      const start = h.createdAt.slice(0, 10)
+      const scheduled = days.filter((d) => d >= start && h.weekdays.includes(weekdayOf(d)))
+      const counts = Object.fromEntries(days.map((d) => [d, countOn(h, d)]).filter(([, n]) => (n as number) > 0))
+      return {
+        name: h.title,
+        weekdays: h.weekdays,
+        times_per_day: timesOf(h),
+        part_of_day: partOf(h),
+        cue: h.cue ?? null,
+        since: start,
+        scheduled_days: scheduled.length,
+        done_days: scheduled.filter((d) => countOn(h, d) >= timesOf(h)).length,
+        done_counts_by_date: counts,
+      }
+    })
 }
 
 /** The money plan as the Analyst sees it: the rows plus Buddy's own forecast from them. */

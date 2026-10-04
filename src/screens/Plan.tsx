@@ -1,6 +1,7 @@
 import { useLiveQuery } from '../ui/live'
 import { useState } from 'react'
 import { formatDayLabel, formatLongDate, formatShortDate } from '../core/dates'
+import { doneOn, dueOn } from '../core/habits'
 import { planFor } from '../core/plan'
 import { db } from '../data/db'
 import { addPlanItem } from '../data/repo-plan'
@@ -9,13 +10,15 @@ import { Icon } from '../ui/icons'
 import { PlanRow } from '../ui/PlanRow'
 import { openSheet } from '../ui/sheets'
 
-/** Light structure: today's tasks, routines, the week's goals, what's coming. */
+/** Light structure: today's tasks, habits, the week's goals, what's coming. */
 export function Plan() {
   const today = useToday(useSettings())
   const items = useLiveQuery(() => db.plan.toArray(), [])
   const [draft, setDraft] = useState('')
   if (!items) return null
   const p = planFor(items, today)
+  const otherHabits = items.filter((h) => h.kind === 'routine' && !h.deletedAt && !h.archived && !dueOn(h, today))
+  const habitsDone = p.routines.filter((h) => doneOn(h, today)).length
   const empty = !p.today.length && !p.overdue.length && !p.routines.length && !p.goals.length && !p.upcoming.length && !p.someday.length
 
   return (
@@ -58,18 +61,42 @@ export function Plan() {
         </form>
       </section>
 
-      {p.routines.length > 0 && (
-        <section aria-labelledby="plan-routines">
-          <h2 id="plan-routines" className="section-title">
-            Routines
+      <section aria-labelledby="plan-habits">
+        <div className="row-between">
+          <h2 id="plan-habits" className="section-title">
+            Habits
           </h2>
-          <ul className="list plan-list">
-            {p.routines.map((r) => (
-              <PlanRow key={r.id} item={r} today={today} />
-            ))}
-          </ul>
-        </section>
-      )}
+          <button type="button" className="btn-text" onClick={() => openSheet({ kind: 'plan-item', planKind: 'routine' })}>
+            <Icon name="plus" size={16} strokeWidth={2.2} />
+            Habit
+          </button>
+        </div>
+        {p.routines.length > 0 && (
+          <>
+            <p className="row-sub pad-l num">
+              {habitsDone} of {p.routines.length} done today
+            </p>
+            <ul className="list plan-list">
+              {p.routines.map((r) => (
+                <PlanRow key={r.id} item={r} today={today} />
+              ))}
+            </ul>
+          </>
+        )}
+        {otherHabits.length > 0 && (
+          <>
+            <h3 className="section-label">Not today</h3>
+            <ul className="list plan-list">
+              {otherHabits.map((r) => (
+                <PlanRow key={r.id} item={r} today={today} />
+              ))}
+            </ul>
+          </>
+        )}
+        {!p.routines.length && !otherHabits.length && (
+          <p className="muted pad-l">Small things you do every day — make bed, brush teeth twice. They show on Today; one tap ticks them.</p>
+        )}
+      </section>
 
       <section aria-labelledby="plan-goals">
         <div className="row-between">
@@ -108,12 +135,7 @@ export function Plan() {
         </section>
       )}
 
-      {empty && <p className="muted pad-l">Tasks, routines and weekly goals live here. Today shows your top three.</p>}
-
-      <button type="button" className="btn-text center-self" onClick={() => openSheet({ kind: 'plan-item', planKind: 'routine' })}>
-        <Icon name="repeat" size={16} />
-        New routine
-      </button>
+      {empty && <p className="muted pad-l">Tasks, habits and weekly goals live here. Today shows your habits and top three tasks.</p>}
     </div>
   )
 }

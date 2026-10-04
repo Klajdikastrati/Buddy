@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { addDays, WEEKDAY_SHORT, weekdayOf, weekStart } from '../core/dates'
-import type { LocalDate, PlanItem, PlanKind } from '../core/types'
+import { consistency, HABIT_IDEAS, PART_LABEL, PARTS, partOf, timesOf } from '../core/habits'
+import type { LocalDate, PartOfDay, PlanItem, PlanKind } from '../core/types'
 import { addPlanItem, setPlanItemDeleted, updatePlanItem } from '../data/repo-plan'
 import { Segmented, SheetFooter } from '../ui/fields'
+import { HabitDots } from '../ui/habit'
 import { useSettings, useToday } from '../ui/hooks'
 import { closeSheet } from '../ui/sheets'
 import { Sheet } from '../ui/Sheet'
@@ -12,28 +14,33 @@ const FORM = 'plan-form'
 const WEEK = [1, 2, 3, 4, 5, 6, 0]
 const KINDS = [
   { value: 'task', label: 'Task' },
-  { value: 'routine', label: 'Routine' },
+  { value: 'routine', label: 'Habit' },
   { value: 'goal', label: 'Weekly goal' },
 ] as const
 
-/** Add or edit a task (a day or someday), a routine (weekdays) or a weekly goal. */
+/** Add or edit a task (a day or someday), a habit (weekdays, times a day, cue) or a weekly goal. */
 export function PlanItemSheet({ item, planKind }: { item?: PlanItem; planKind?: PlanKind }) {
   const today = useToday(useSettings())
   const [kind, setKind] = useState<PlanKind>(item?.kind ?? planKind ?? 'task')
   const [title, setTitle] = useState(item?.title ?? '')
   const [day, setDay] = useState<LocalDate | null>(item ? item.localDate : today)
   const [weekdays, setWeekdays] = useState<number[]>(item?.kind === 'routine' ? item.weekdays : [0, 1, 2, 3, 4, 5, 6])
+  const [times, setTimes] = useState(item ? timesOf(item) : 1)
+  const [part, setPart] = useState<PartOfDay>(item ? partOf(item) : 'anytime')
+  const [cue, setCue] = useState(item?.cue ?? '')
   const thisWeek = weekStart(today)
   const [week, setWeek] = useState<LocalDate>(item?.kind === 'goal' && item.localDate ? item.localDate : thisWeek)
   const [error, setError] = useState<string | null>(null)
+  const habit = kind === 'routine'
 
   async function save() {
     if (!title.trim()) return setError('Write what it is.')
-    if (kind === 'routine' && !weekdays.length) return setError('Pick at least one day.')
+    if (habit && !weekdays.length) return setError('Pick at least one day.')
     const values = {
       title,
       localDate: kind === 'task' ? day : kind === 'goal' ? week : null,
-      weekdays: kind === 'routine' ? weekdays : [],
+      weekdays: habit ? weekdays : [],
+      ...(habit ? { timesPerDay: times, partOfDay: part, cue: cue.trim() || null } : {}),
     }
     if (item) await updatePlanItem(item, values)
     else await addPlanItem({ kind, ...values })
@@ -53,12 +60,13 @@ export function PlanItemSheet({ item, planKind }: { item?: PlanItem; planKind?: 
       {label}
     </button>
   )
+  const record = item?.kind === 'routine' ? consistency(item, today, 30) : null
 
   return (
     <Sheet
       open
       onClose={closeSheet}
-      title={item ? 'Edit' : 'Add to plan'}
+      title={item ? 'Edit' : habit ? 'New habit' : 'Add to plan'}
       footer={<SheetFooter form={FORM} onDelete={item ? () => void remove() : undefined} />}
     >
       <form
@@ -70,14 +78,25 @@ export function PlanItemSheet({ item, planKind }: { item?: PlanItem; planKind?: 
         }}
       >
         {!item && <Segmented label="Kind" options={KINDS} value={kind} onChange={setKind} />}
+
+        {record && (
+          <div className="habit-record">
+            <span className="field-label">Last 30 days</span>
+            <HabitDots c={record} />
+            <span className="row-sub num">
+              Done on {record.done} of {record.scheduled} scheduled {record.scheduled === 1 ? 'day' : 'days'}
+            </span>
+          </div>
+        )}
+
         <label className="field">
-          <span className="field-label">{kind === 'goal' ? 'Goal' : kind === 'routine' ? 'Routine' : 'Task'}</span>
+          <span className="field-label">{kind === 'goal' ? 'Goal' : habit ? 'Habit' : 'Task'}</span>
           <input
             className="input"
             autoComplete="off"
             maxLength={200}
-            data-autofocus={item ? undefined : ''}
-            placeholder={kind === 'goal' ? 'Train 4 times' : kind === 'routine' ? 'Stretch 10 min' : 'Call the bank'}
+            data-autofocus={item || habit ? undefined : ''}
+            placeholder={kind === 'goal' ? 'Train 4 times' : habit ? 'Make bed' : 'Call the bank'}
             value={title}
             onChange={(e) => {
               setTitle(e.target.value)
@@ -85,6 +104,60 @@ export function PlanItemSheet({ item, planKind }: { item?: PlanItem; planKind?: 
             }}
           />
         </label>
+
+        {habit && !item && !title.trim() && (
+          <fieldset className="field">
+            <legend className="field-label">Ideas</legend>
+            <div className="chips">
+              {HABIT_IDEAS.map((idea) => (
+                <button
+                  key={idea.title}
+                  type="button"
+                  className="chip"
+                  onClick={() => {
+                    setTitle(idea.title)
+                    setTimes(idea.timesPerDay)
+                    setPart(idea.partOfDay)
+                    setCue(idea.cue ?? '')
+                  }}
+                >
+                  {idea.title}
+                  {idea.timesPerDay > 1 ? ` ×${idea.timesPerDay}` : ''}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        )}
+
+        {habit && (
+          <>
+            <fieldset className="field">
+              <legend className="field-label">Times a day</legend>
+              <div className="chips">
+                {[1, 2, 3, 4].map((n) => (
+                  <button key={n} type="button" className={`chip num ${times === n ? 'on' : ''}`} aria-pressed={times === n} onClick={() => setTimes(n)}>
+                    {n}×
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="field">
+              <legend className="field-label">When</legend>
+              <div className="chips">
+                {PARTS.map((p) => (
+                  <button key={p} type="button" className={`chip ${part === p ? 'on' : ''}`} aria-pressed={part === p} onClick={() => setPart(p)}>
+                    {PART_LABEL[p]}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <label className="field">
+              <span className="field-label">Right after I… (optional)</span>
+              <input className="input" autoComplete="off" maxLength={120} placeholder="wake up · brush my teeth · get home" value={cue} onChange={(e) => setCue(e.target.value)} />
+              <span className="field-hint">Tying a habit to something you already do every day is what makes it stick.</span>
+            </label>
+          </>
+        )}
 
         {kind === 'task' && (
           <fieldset className="field">
@@ -104,7 +177,7 @@ export function PlanItemSheet({ item, planKind }: { item?: PlanItem; planKind?: 
           </fieldset>
         )}
 
-        {kind === 'routine' && (
+        {habit && (
           <fieldset className="field">
             <legend className="field-label">On</legend>
             <div className="weekdays">
@@ -120,9 +193,7 @@ export function PlanItemSheet({ item, planKind }: { item?: PlanItem; planKind?: 
                 </button>
               ))}
             </div>
-            <p className="field-hint">
-              Shows on Plan on {weekdays.includes(weekdayOf(today)) ? 'today and ' : ''}the days you pick.
-            </p>
+            <p className="field-hint">Shows on Today on {weekdays.includes(weekdayOf(today)) ? 'today and ' : ''}the days you pick.</p>
           </fieldset>
         )}
 

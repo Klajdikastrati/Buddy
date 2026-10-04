@@ -63,7 +63,8 @@ Single user in Albania (currency Lek/ALL, timezone Europe/Tirane, days start at 
 `interventions`, `daily` (one row per day: spend, income, kcal, protein_g, caffeine_mg, food_entries,
 food_incomplete, sleep_min, sleep_quality, weight_kg, activity_min, km, steps, workouts, volume_kg, mood, energy,
 stress, productivity, trackers), `entries`, `foods_used`, `workouts` (with sets), `exercises`, `checkins`,
-`trackers`, `workout_templates`, `money_plan` (`plans` + `forecast`: balance, everyday spend/day, next payday, free
+`trackers`, `workout_templates`, `habits` (each with `scheduled_days`, `done_days`, `done_counts_by_date`),
+`money_plan` (`plans` + `forecast`: balance, everyday spend/day, next payday, free
 per day until payday, projected at payday, upcoming), `data_quality`, `signals` (Pearson r, n, 95% CI, ready
 flag), `analysis_contract`.
 `null` always means "not logged / unknown", never zero.
@@ -118,6 +119,10 @@ Rules for `proposed_changes`:
 - **plan_item** — `kind` goal | routine | task; `title` ≤120 chars. Goal needs `week`: "this" | "next". Routine
   needs `weekdays`: distinct 0–6 (0 = Sunday, so Mon–Fri is [1,2,3,4,5]). Task takes `date` (YYYY-MM-DD) or null for
   someday. At most 10 plan items per file.
+  A routine is a **habit** in Buddy (pills on Today, one tap ticks). Optional habit fields: `times_per_day` 1–10
+  (brush teeth = 2), `part_of_day` morning | afternoon | evening | anytime, `cue` ≤120 chars completing "right after
+  I …" (e.g. "wake up"). Give every new habit a cue tied to something the user already does daily — that's the
+  strongest lever for habit formation. Start with 1–3 habits, not ten.
 - **money_plan** — `kind` bill | income | planned; `name` ≤80; `amount` > 0 in the user's currency (`currency` must
   equal it — convert EUR first and say the rate you used). Bill/income need `day_of_month` 1–31 (monthly) and
   `date` null; planned needs `date`. Never propose a balance — ask the user and let them set it. A row with the same

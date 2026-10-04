@@ -2,6 +2,7 @@ import { useLiveQuery } from '../ui/live'
 import { useEffect, useMemo, useState } from 'react'
 import { ACTIVITY_LABEL, activityOn, sleepSummary, weightSummary } from '../core/body'
 import { counterField, counterStats, formatGap } from '../core/counter'
+import { countOn, doneOn, habitsOn, timesOf } from '../core/habits'
 import { addDays, formatDuration, formatShortDate, hourIn, monthStart, weekdayOf, weekStart } from '../core/dates'
 import { formatMoney, moneySummary } from '../core/money'
 import { nutritionOn } from '../core/nutrition'
@@ -9,13 +10,14 @@ import { priorities } from '../core/plan'
 import { formatNumber } from '../core/numbers'
 import { targetOn } from '../core/targets'
 import { durationMin, finishedWorkouts, templatesOn, workoutsInWeek } from '../core/training'
-import type { DayCheckin, Entry, ID, LocalDate, Target, TrackerDef, WorkoutTemplate } from '../core/types'
+import type { DayCheckin, Entry, ID, LocalDate, PlanItem, Target, TrackerDef, WorkoutTemplate } from '../core/types'
 import { db } from '../data/db'
 import { setEntryDeleted } from '../data/repo'
 import { logTracker } from '../data/repo-trackers'
 import { Bar } from '../ui/Bar'
 import { DOMAIN, type DomainKey } from '../ui/domains'
 import { EntryRow } from '../ui/EntryRow'
+import { tapHabit } from '../ui/habit'
 import { navigate, useSettings, useToday } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
 import { PlanRow } from '../ui/PlanRow'
@@ -69,6 +71,8 @@ export function Today() {
         <BodyTiles entries={entries} weights={weights} today={today} targets={targets} />
         <WorkoutTile entries={entries} today={today} targets={targets} templates={templates} active={activeWorkout} />
       </div>
+
+      <HabitsCard plan={plan} today={today} />
 
       {counters.map((c) => (
         <CounterCard key={c.id} def={c} today={today} />
@@ -428,6 +432,46 @@ function CounterCard({ def, today }: { def: TrackerDef; today: LocalDate }) {
       <button type="button" className="counter-add" aria-label={`Add one ${def.name.toLowerCase()}`} onClick={() => void add()}>
         <Icon name="plus" size={26} strokeWidth={2.6} />
       </button>
+    </section>
+  )
+}
+
+/** Today's habits as pills: one tap ticks (2× habits count 1/2 → ✓); morning first. */
+function HabitsCard({ plan, today }: { plan: PlanItem[]; today: LocalDate }) {
+  const habits = habitsOn(plan, today)
+  if (!habits.length) return null
+  const done = habits.filter((h) => doneOn(h, today)).length
+  return (
+    <section aria-labelledby="habits-h">
+      <div className="label-row">
+        <h2 id="habits-h" className="section-label">
+          Habits
+        </h2>
+        <button type="button" className="btn-text small num" onClick={() => navigate('/plan')}>
+          {done} of {habits.length} done
+          <Icon name="chevronRight" size={14} strokeWidth={2.4} />
+        </button>
+      </div>
+      <div className="habit-pills" style={{ '--tint': DOMAIN.plan.tint } as React.CSSProperties}>
+        {habits.map((h) => {
+          const c = countOn(h, today)
+          const t = timesOf(h)
+          const isDone = c >= t
+          return (
+            <button
+              key={h.id}
+              type="button"
+              className={`habit-pill ${isDone ? 'done' : c ? 'partial' : ''}`}
+              aria-pressed={isDone}
+              aria-label={`${h.title}: ${isDone ? 'done — tap to clear' : t > 1 ? `${c} of ${t}` : 'not done'}`}
+              onClick={() => void tapHabit(h, today)}
+            >
+              <span className="habit-mark">{isDone ? <Icon name="check" size={14} strokeWidth={3} /> : t > 1 ? <span className="num">{`${c}/${t}`}</span> : null}</span>
+              <span className="habit-name">{h.title}</span>
+            </button>
+          )
+        })}
+      </div>
     </section>
   )
 }

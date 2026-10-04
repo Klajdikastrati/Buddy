@@ -23,7 +23,7 @@ Rationale: `docs/history/PHASE0_AUDIT_AND_PROPOSAL.md` §9. Types: `src/core/typ
 | `foods` | `foods` | servings/ingredients JSONB |
 | `exercises`, `templates`, `sets` | `exercises`, `workout_templates`, `workout_sets` | sets reference the workout entry |
 | `checkins` | `day_checkins` | keyed by date |
-| `plan` | `plan_items` | task / routine (`weekdays`, `doneDates`) / goal |
+| `plan` | `plan_items` | task / routine = **habit** (`weekdays`, `doneDates` one entry per completion — a day twice = 2×, `timesPerDay`, `partOfDay`, `cue`; migration `20261004130000_habits.sql`) / goal. Per-day counts are kept forever (History shows any past day). |
 | `trackers` | `tracker_defs` | fields JSONB; values in `entry_custom` |
 | `targets` | `targets` | |
 | `analystRuns`, `recommendations` | `analyst_runs`, `recommendations` | imported analyses + proposals (type target · plan_item · money_plan · tracker · workout_template; `details` jsonb for non-targets) |

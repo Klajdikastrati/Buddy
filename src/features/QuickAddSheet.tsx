@@ -79,27 +79,40 @@ export function QuickAddSheet() {
 
   return (
     <Sheet open onClose={closeSheet} title="Quick add">
-      <div className="quick-actions">
-        {actions.map((a) => (
-          <button key={a.key ?? a.domain} type="button" className="action" onClick={a.open}>
-            <IconChip name={DOMAIN[a.domain].icon} tint={DOMAIN[a.domain].tint} size="lg" />
-            <span className="action-label">{a.label ?? DOMAIN[a.domain].label}</span>
-          </button>
-        ))}
-      </div>
-
+      {/* Search on top (like Spotlight): once you type, you've chosen — the tiles step
+          aside and the results get the room above the keyboard. */}
       <div className="search">
         <Icon name="search" size={18} />
         <input
           className="input"
           type="search"
           autoComplete="off"
-          placeholder="Search…"
+          placeholder="Search recent, foods…"
           aria-label="Search items"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
       </div>
+
+      {q ? (
+        <div className="pair">
+          <button type="button" className="btn btn-quiet" onClick={() => openSheet({ kind: 'food', query: q })}>
+            Food “{q}”
+          </button>
+          <button type="button" className="btn btn-quiet" onClick={() => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q } })}>
+            Expense “{q}”
+          </button>
+        </div>
+      ) : (
+        <div className="quick-actions">
+          {actions.map((a) => (
+            <button key={a.key ?? a.domain} type="button" className="action" onClick={a.open}>
+              <IconChip name={DOMAIN[a.domain].icon} tint={DOMAIN[a.domain].tint} size="lg" />
+              <span className="action-label">{a.label ?? DOMAIN[a.domain].label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {items && items.length > 0 && <h3 className="section-label">{q ? 'Matches' : 'Recent'}</h3>}
       <ul className="list with-icons">
@@ -148,16 +161,6 @@ export function QuickAddSheet() {
         </>
       )}
 
-      {q && (
-        <div className="pair">
-          <button type="button" className="btn btn-quiet" onClick={() => openSheet({ kind: 'food', query: q })}>
-            Food “{q}”
-          </button>
-          <button type="button" className="btn btn-quiet" onClick={() => openSheet({ kind: 'money', prefill: { kind: 'expense', title: q } })}>
-            Expense “{q}”
-          </button>
-        </div>
-      )}
       {items && items.length === 0 && <p className="muted">Things you log appear here for one-tap repeats.</p>}
     </Sheet>
   )

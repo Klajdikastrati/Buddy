@@ -97,6 +97,20 @@ db.version(3).stores({
   moneyPlans: 'id, kind, updatedAt',
 })
 
+// Habits: routines gained times per day, part of day and a cue.
+db.version(4)
+  .stores({})
+  .upgrade((tx) =>
+    tx
+      .table('plan')
+      .toCollection()
+      .modify((p: Partial<PlanItem>) => {
+        p.timesPerDay ??= 1
+        p.partOfDay ??= 'anytime'
+        p.cue ??= null
+      }),
+  )
+
 export const DEFAULT_SETTINGS: Settings = {
   currency: 'ALL',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Tirane',

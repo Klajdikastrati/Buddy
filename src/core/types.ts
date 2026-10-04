@@ -203,15 +203,24 @@ export interface WorkoutSet extends Synced {
 
 export type PlanKind = 'task' | 'routine' | 'goal'
 
+/** When in the day a habit happens — orders Today's habits and anchors the cue. */
+export type PartOfDay = 'morning' | 'afternoon' | 'evening' | 'anytime'
+
 export interface PlanItem extends Synced {
   kind: PlanKind
   title: string
   /** task: the day it's for (null = someday). goal: the week's Monday. */
   localDate: LocalDate | null
-  /** routine: days it applies (0 = Sunday). */
+  /** routine (shown as "habit"): days it applies (0 = Sunday). */
   weekdays: number[]
-  /** routine: days it was done. */
+  /** routine: one entry per completion — a day appears twice when a 2×/day habit is fully done. */
   doneDates: LocalDate[]
+  /** routine: completions per day that count as done (brush teeth = 2). */
+  timesPerDay: number
+  /** routine: when in the day. */
+  partOfDay: PartOfDay
+  /** routine: the cue it follows ("after I wake up") — implementation intention. */
+  cue: string | null
   /** task / goal: when completed. */
   doneAt: Instant | null
   archived: boolean
@@ -271,6 +280,10 @@ export interface PlanProposal {
   weekdays: number[]
   week: 'this' | 'next' | null
   date: LocalDate | null
+  /** routine only; older stored proposals lack these. */
+  timesPerDay?: number
+  partOfDay?: PartOfDay
+  cue?: string | null
 }
 
 /** A money-plan row the Analyst suggests (never a balance — only the user knows that). */

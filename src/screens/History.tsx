@@ -1,16 +1,19 @@
 import { useLiveQuery } from '../ui/live'
 import { useMemo, useState } from 'react'
-import { addDays, formatDayLabel, formatDuration } from '../core/dates'
+import { counterField } from '../core/counter'
+import { addDays, formatDayLabel, formatDuration, formatTime } from '../core/dates'
+import { habitsForDay } from '../core/habits'
 import { formatMoney } from '../core/money'
 import { formatNumber } from '../core/numbers'
 import { dailySeries, trends, type Trend } from '../core/series'
 import { correlations, describeSignal, weekdayWeekend, type Signal, type WeekSplit } from '../core/signals'
-import type { DayCheckin, Entry } from '../core/types'
+import type { DayCheckin, Entry, PlanItem, TrackerDef } from '../core/types'
 import { db } from '../data/db'
 import { EntryRow } from '../ui/EntryRow'
 import { Segmented } from '../ui/fields'
 import { useSettings, useToday } from '../ui/hooks'
-import { Icon } from '../ui/icons'
+import { DOMAIN } from '../ui/domains'
+import { Icon, IconChip } from '../ui/icons'
 
 const PAGE_DAYS = 60
 type View = 'days' | 'trends' | 'signals'
@@ -64,6 +67,7 @@ function Days() {
   const checkins = useLiveQuery(() => db.checkins.where('localDate').aboveOrEqual(from).toArray(), [from])
   const categories = useLiveQuery(() => db.categories.toArray(), [])
   const trackers = useLiveQuery(() => db.trackers.toArray(), [])
+  const plan = useLiveQuery(() => db.plan.toArray(), [])
   const catName = useMemo(() => new Map(categories?.map((c) => [c.id, c.name])), [categories])
   const trackerById = useMemo(() => new Map(trackers?.map((t) => [t.id, t])), [trackers])
   const checkinOn = useMemo(() => new Map(checkins?.map((c) => [c.localDate, c])), [checkins])
@@ -72,6 +76,8 @@ function Days() {
     const map = new Map<string, Entry[]>()
     for (const e of entries ?? []) map.set(e.localDate, [...(map.get(e.localDate) ?? []), e])
     for (const c of checkins ?? []) if (!map.has(c.localDate) && checkinText(c)) map.set(c.localDate, [])
+    // Days where only habits were ticked still show up.
+    for (const h of plan ?? []) if (h.kind === 'routine' && !h.deletedAt) for (const d of h.doneDates) if (d >= from && !map.has(d)) map.set(d, [])
     return [...map.entries()]
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([day, list]) => ({
@@ -80,7 +86,7 @@ function Days() {
         spent: list.reduce((t, e) => t + (e.money?.direction === 'out' ? e.money.amount : 0), 0),
         kcal: list.reduce((t, e) => t + (e.nutrition?.kcal ?? 0), 0),
       }))
-  }, [entries, checkins])
+  }, [entries, checkins, plan, from])
 
   if (!entries) return null
 
@@ -98,8 +104,21 @@ function Days() {
               </span>
             </div>
             {c && checkinText(c) && <p className="day-checkin num">{checkinText(c)}</p>}
+            <DayHabits day={g.day} plan={plan ?? []} />
             <ul className="list with-icons">
-              {g.list.map((e) => (
+              {counterSummaries(g.list, trackers ?? [], settings.timezone).map((s) => (
+                <li key={s.id} className="list-row">
+                  <span className="row-icon">
+                    <IconChip name="tracker" tint={DOMAIN.tracker.tint} />
+                  </span>
+                  <span className="row-main static">
+                    <span className="row-title">{s.name}</span>
+                    <span className="row-sub num">{s.span}</span>
+                  </span>
+                  <span className="row-side num">{s.total}</span>
+                </li>
+              ))}
+              {g.list.filter((e) => !isCounterTap(e, trackers ?? [])).map((e) => (
                 <EntryRow
                   key={e.id}
                   entry={e}
@@ -118,6 +137,44 @@ function Days() {
         </button>
       )}
     </>
+  )
+}
+
+const isCounterTap = (e: Entry, trackers: TrackerDef[]) => {
+  const t = e.custom && trackers.find((x) => x.id === e.custom!.trackerId)
+  return !!t && !!counterField(t)
+}
+
+/** Tap-counter entries (one per cigarette) shown as one row per counter: total and first–last time. */
+function counterSummaries(list: Entry[], trackers: TrackerDef[], timeZone: string) {
+  const out: { id: string; name: string; total: number; span: string }[] = []
+  for (const t of trackers) {
+    const f = counterField(t)
+    if (!f) continue
+    const taps = list.filter((e) => e.custom?.trackerId === t.id).sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
+    if (!taps.length) continue
+    const total = taps.reduce((n, e) => n + (Number(e.custom!.values[f.key]) || 0), 0)
+    const first = formatTime(taps[0].occurredAt, timeZone)
+    const last = formatTime(taps[taps.length - 1].occurredAt, timeZone)
+    out.push({ id: t.id, name: t.name, total, span: first === last ? first : `${first} – ${last}` })
+  }
+  return out
+}
+
+/** The day's habits — done ✓, partly 1/2, not done plain. A permanent record of each day. */
+function DayHabits({ day, plan }: { day: string; plan: PlanItem[] }) {
+  const rows = habitsForDay(plan, day)
+  if (!rows.length) return null
+  return (
+    <p className="day-habits" aria-label="Habits">
+      {rows.map((r) => (
+        <span key={r.habit.id} className={`dh ${r.count >= r.times ? 'dh-done' : r.count ? 'dh-partial' : 'dh-open'}`}>
+          {r.count >= r.times ? '✓ ' : ''}
+          {r.habit.title}
+          {r.times > 1 && r.count < r.times ? ` ${r.count}/${r.times}` : r.times > 1 ? ` ×${r.times}` : ''}
+        </span>
+      ))}
+    </p>
   )
 }
 

@@ -35,3 +35,6 @@ Success metric: still opened daily six months from now.
   motion — swipeable tab pager, pushed screens, draggable sheets (user: static/delayed feel is very noticeable).
 - 2026-10-04 — Navigation follows the GitHub iOS app instead: instant in-place tab switch (no tab swipe), gliding
   glass bubble you can drag along the tab bar; Home Screen black strip fixed (shell = 100lvh).
+- 2026-10-04 — Habits are first-class (user: "it doesn't attack habit creation"): routines become habits with times
+  a day, part of day and a cue; tap-to-tick pills on Today; History keeps every day's record ("I need to know 6 months
+  from now if I brushed twice today"). Evidence, not gamification: "done 5 of 7", no streaks or points.

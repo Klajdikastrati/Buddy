@@ -157,3 +157,33 @@ describe('setup proposals', () => {
     ])
   })
 })
+
+describe('habit proposals', () => {
+  const base = () => ({ ...valid(), proposed_changes: [] as unknown[] })
+  it('accepts times per day, part of day and a cue on routines, with defaults', () => {
+    const doc = base()
+    doc.proposed_changes = [
+      { id: 'h1', type: 'plan_item', kind: 'routine', title: 'Brush teeth', weekdays: [0, 1, 2, 3, 4, 5, 6], times_per_day: 2, part_of_day: 'anytime', cue: 'breakfast and before bed', reason: 'r', confidence: 'high' },
+      { id: 'h2', type: 'plan_item', kind: 'routine', title: 'Make bed', weekdays: [1, 2, 3, 4, 5], reason: 'r', confidence: 'high' },
+    ]
+    const r = validateAnalysis(doc, 'ALL')
+    expect(r.ok && r.value.proposed_changes.map((p) => (p.type === 'plan_item' ? [p.times_per_day, p.part_of_day, p.cue] : null))).toEqual([
+      [2, 'anytime', 'breakfast and before bed'],
+      [1, 'anytime', null],
+    ])
+  })
+
+  it('rejects habit fields on tasks and out-of-range values', () => {
+    const doc = base()
+    doc.proposed_changes = [
+      { id: 't1', type: 'plan_item', kind: 'task', title: 'Call', date: null, times_per_day: 2, reason: 'r', confidence: 'low' },
+      { id: 'h1', type: 'plan_item', kind: 'routine', title: 'Teeth', weekdays: [1], times_per_day: 0, part_of_day: 'noon', reason: 'r', confidence: 'low' },
+    ]
+    const r = validateAnalysis(doc, 'ALL')
+    expect(!r.ok && r.errors).toEqual([
+      'proposed_changes[0].times_per_day: only routines (habits) have this',
+      'proposed_changes[1].times_per_day: must be a whole number 1–10',
+      'proposed_changes[1].part_of_day: must be one of morning, afternoon, evening, anytime',
+    ])
+  })
+})

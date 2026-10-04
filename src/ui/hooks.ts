@@ -70,36 +70,62 @@ export function usePath(): string {
 }
 
 /**
- * iOS keeps `position: fixed; bottom: 0` behind the on-screen keyboard. Expose
- * the covered height as `--kb` so sheets can sit above it.
+ * The on-screen keyboard. iOS reports it inconsistently (innerHeight is wrong in
+ * iOS 26 Home Screen apps, and it may pan the page instead of resizing), so we
+ * only trust the *visible* area: `--vvt` / `--vvh` are its top and height, and
+ * `html.kb-open` is set while the keyboard is up. An open sheet then fills the
+ * visible area exactly (status bar → keyboard), like a native sheet's large
+ * detent; its top edge glides there (FLIP) instead of jumping.
  */
 export function useKeyboardInset() {
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
-    // iOS fires several resize/scroll events while the keyboard settles; apply at most
-    // once per frame and ignore sub-pixel noise so the sheet doesn't jitter.
-    let last = { kb: -1, vvh: -1 }
+    const root = document.documentElement
+    let tallest = vv.height
+    let last = { top: -1, h: -1, open: false }
     let frame = 0
     const apply = () => {
       frame = 0
-      const kb = Math.round(Math.max(0, window.innerHeight - vv.height - vv.offsetTop))
-      const vvh = Math.round(vv.height)
-      if (Math.abs(kb - last.kb) < 2 && Math.abs(vvh - last.vvh) < 2) return
-      last = { kb, vvh }
-      document.documentElement.style.setProperty('--kb', `${kb}px`)
-      document.documentElement.style.setProperty('--vvh', `${vvh}px`)
+      tallest = Math.max(tallest, vv.height)
+      const open = vv.height < tallest - 150
+      const top = Math.round(vv.offsetTop)
+      const h = Math.round(vv.height)
+      if (open === last.open && Math.abs(top - last.top) < 2 && Math.abs(h - last.h) < 2) return
+      const panels = open !== last.open ? [...document.querySelectorAll<HTMLElement>('dialog[open] .sheet-panel')] : []
+      const before = panels.map((p) => p.getBoundingClientRect().top)
+      last = { top, h, open }
+      root.style.setProperty('--vvt', `${top}px`)
+      root.style.setProperty('--vvh', `${h}px`)
+      root.classList.toggle('kb-open', open)
+      panels.forEach((p, i) => {
+        // A sheet still sliding in lands in the new place by itself.
+        if (p.getAnimations().some((a) => a.playState === 'running')) return
+        const dy = before[i] - p.getBoundingClientRect().top
+        if (Math.abs(dy) < 2) return
+        p.animate([{ transform: `translate3d(0, ${dy}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }], {
+          duration: 300,
+          easing: 'cubic-bezier(0.32, 0.72, 0, 1)',
+        })
+      })
     }
     const update = () => {
       if (!frame) frame = requestAnimationFrame(apply)
     }
+    // A new orientation has a new full height.
+    const reset = () => {
+      tallest = 0
+      update()
+    }
     update()
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
+    screen.orientation?.addEventListener('change', reset)
     return () => {
       cancelAnimationFrame(frame)
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
+      screen.orientation?.removeEventListener('change', reset)
     }
   }, [])
 }

@@ -1,4 +1,5 @@
 import { weekdayOf, weekStart } from './dates'
+import { doneOn } from './habits'
 import type { LocalDate, PlanItem } from './types'
 
 export interface DayPlan {
@@ -39,4 +40,4 @@ export function priorities(items: PlanItem[], today: LocalDate, limit = 3): { sh
   return { shown: open.slice(0, limit), more: Math.max(0, open.length - limit) }
 }
 
-export const isDoneOn = (item: PlanItem, day: LocalDate) => (item.kind === 'routine' ? item.doneDates.includes(day) : !!item.doneAt)
+export const isDoneOn = (item: PlanItem, day: LocalDate) => (item.kind === 'routine' ? doneOn(item, day) : !!item.doneAt)

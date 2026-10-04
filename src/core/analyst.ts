@@ -2,7 +2,7 @@
 // bad field rejects the whole file, with every problem listed, because
 // anything that can change a target must be exactly what Buddy expects.
 import { isTargetKey, targetDef } from './targets'
-import type { MoneyPlanProposal, PlanKind, PlanProposal, RecommendationType, TargetKey, TemplateProposal, TrackerFieldType, TrackerProposal } from './types'
+import type { MoneyPlanProposal, PartOfDay, PlanKind, PlanProposal, RecommendationType, TargetKey, TemplateProposal, TrackerFieldType, TrackerProposal } from './types'
 
 export const ANALYSIS_SCHEMA_VERSION = '1'
 const LEVELS = ['observation', 'correlation', 'hypothesis', 'recommendation'] as const
@@ -45,9 +45,15 @@ export interface ProposedPlanItem {
   weekdays: number[]
   week: 'this' | 'next' | null
   date: string | null
+  /** routine (habit) only: completions a day, part of day, and the cue it follows. */
+  times_per_day: number
+  part_of_day: PartOfDay
+  cue: string | null
   reason: string
   confidence: (typeof CONFIDENCE)[number]
 }
+
+const PARTS_OF_DAY = ['morning', 'afternoon', 'evening', 'anytime'] as const
 
 /** A monthly bill / income (day_of_month) or a planned one-off spend (date), in the user's currency. */
 export interface ProposedMoneyPlan {
@@ -336,7 +342,7 @@ export function validateAnalysis(doc: unknown, currency: string): ValidationResu
       return
     }
     if (raw.type === 'plan_item') {
-      c.keys(raw, p, ['id', 'type', 'kind', 'title', 'weekdays', 'week', 'date', 'reason', 'confidence'])
+      c.keys(raw, p, ['id', 'type', 'kind', 'title', 'weekdays', 'week', 'date', 'times_per_day', 'part_of_day', 'cue', 'reason', 'confidence'])
       if (++planCount > 10) return c.fail(p, 'at most 10 plan items per analysis')
       const id = c.str(raw, 'id', p, { max: 200 })
       const kind = c.oneOf(raw, 'kind', p, PLAN_KINDS)
@@ -362,7 +368,24 @@ export function validateAnalysis(doc: unknown, currency: string): ValidationResu
         if (typeof raw.date !== 'string' || !validDate(raw.date)) c.fail(`${p}.date`, 'must be a date YYYY-MM-DD or null (someday)')
         else date = raw.date
       } else if (kind !== 'task' && raw.date !== undefined && raw.date !== null) c.fail(`${p}.date`, 'only tasks have a date')
-      if (id && kind && title && reason && confidence) proposed.push({ id, type: 'plan_item', kind, title, weekdays, week, date, reason, confidence })
+      // Habit details (routines only; all optional).
+      let times = 1
+      let part: PartOfDay = 'anytime'
+      let cue: string | null = null
+      const habitKeys = ['times_per_day', 'part_of_day', 'cue'].filter((k) => raw[k] !== undefined && raw[k] !== null)
+      if (kind && kind !== 'routine') habitKeys.forEach((k) => c.fail(`${p}.${k}`, 'only routines (habits) have this'))
+      if (kind === 'routine') {
+        const t = raw.times_per_day
+        if (t !== undefined && t !== null) {
+          if (typeof t !== 'number' || !Number.isInteger(t) || t < 1 || t > 10) c.fail(`${p}.times_per_day`, 'must be a whole number 1–10')
+          else times = t
+        }
+        if (raw.part_of_day !== undefined && raw.part_of_day !== null) part = c.oneOf(raw, 'part_of_day', p, PARTS_OF_DAY) ?? 'anytime'
+        if (raw.cue !== undefined && raw.cue !== null) cue = c.str(raw, 'cue', p, { max: 120 })
+      }
+      if (id && kind && title && reason && confidence) {
+        proposed.push({ id, type: 'plan_item', kind, title, weekdays, week, date, times_per_day: times, part_of_day: part, cue, reason, confidence })
+      }
       return
     }
     c.keys(raw, p, ['id', 'type', 'target_key', 'current_value', 'suggested_value', 'unit', 'reason', 'confidence', 'review_after_days'])
@@ -421,8 +444,18 @@ export function validateAnalysis(doc: unknown, currency: string): ValidationResu
 export function describeProposal(type: RecommendationType, details: unknown, currency: string, fmtMoney: (n: number, c: string) => string, fmtDate: (d: string) => string, fmtDays: (d: number[]) => string) {
   if (type === 'plan_item') {
     const d = details as PlanProposal
-    const label = d.kind === 'goal' ? 'Weekly goal' : d.kind === 'routine' ? 'Routine' : 'Task'
-    const when = d.kind === 'goal' ? (d.week === 'next' ? 'Next week' : 'This week') : d.kind === 'routine' ? fmtDays(d.weekdays) : d.date ? fmtDate(d.date) : 'Someday'
+    const label = d.kind === 'goal' ? 'Weekly goal' : d.kind === 'routine' ? 'Habit' : 'Task'
+    const habit = [(d.timesPerDay ?? 1) > 1 ? `${d.timesPerDay}× a day` : null, d.partOfDay && d.partOfDay !== 'anytime' ? d.partOfDay : null, d.cue ? `after ${d.cue}` : null]
+    const when =
+      d.kind === 'goal'
+        ? d.week === 'next'
+          ? 'Next week'
+          : 'This week'
+        : d.kind === 'routine'
+          ? [fmtDays(d.weekdays), ...habit].filter(Boolean).join(' · ')
+          : d.date
+            ? fmtDate(d.date)
+            : 'Someday'
     return { label, title: d.title, sub: when, action: 'Add to plan', done: 'Added to Plan' }
   }
   if (type === 'money_plan') {

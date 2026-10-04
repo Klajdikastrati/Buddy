@@ -1094,10 +1094,9 @@ select.input-inline {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: var(--kb);
+  bottom: 0;
   max-width: 560px;
   margin: 0 auto;
-  /* Fit the *visible* area (the keyboard may also pan the viewport on iOS). */
   max-height: calc(var(--vvh, 100%) - var(--safe-t) - 12px);
   display: flex;
   flex-direction: column;
@@ -1176,7 +1175,7 @@ select.input-inline {
 }
 
 .action {
-  min-height: 82px;
+  min-height: 74px;
   border-radius: var(--r-lg);
   border: 0;
   background: var(--surface);
@@ -2602,11 +2601,22 @@ section > .label-row {
   height: 5px;
 }
 
-/* Glide to the keyboard's new edge instead of jumping (iOS keyboard curve ≈ 250 ms). */
-.sheet-panel {
-  transition:
-    bottom 260ms cubic-bezier(0.32, 0.72, 0, 1),
-    max-height 260ms cubic-bezier(0.32, 0.72, 0, 1);
+/* Keyboard up: the sheet fills exactly the visible area — header under the status
+   bar, content in between, footer on the keyboard. No dead space above, nothing
+   hidden behind the keys. (useKeyboardInset sets --vvt/--vvh and .kb-open.) */
+html.kb-open .sheet-panel {
+  top: calc(var(--vvt, 0px) + var(--safe-t) + 8px);
+  bottom: auto;
+  height: calc(var(--vvh, 100%) - var(--safe-t) - 8px);
+  max-height: none;
+}
+
+html.kb-open .sheet-foot {
+  padding-bottom: 10px;
+}
+
+html.kb-open .sheet-body:last-child {
+  padding-bottom: 16px;
 }
 
 .toast {
@@ -2831,4 +2841,158 @@ button.block .btn {
 
 .counter-add:active {
   transform: scale(0.9);
+}
+
+/* ---- Habits ---- */
+.habit-pills {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.habit-pill {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1), var(--highlight);
+  text-align: left;
+  font-size: 15px;
+  font-weight: 600;
+  transition: transform 100ms var(--ease);
+}
+
+.habit-pill:active {
+  transform: scale(0.97);
+}
+
+.habit-name {
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.2;
+  font-size: 14.5px;
+}
+
+.habit-pill.done .habit-name {
+  color: var(--fg-2);
+}
+
+.habit-mark {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 2px var(--fg-3);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--tint);
+  transition: background-color 140ms var(--ease), box-shadow 140ms var(--ease);
+}
+
+.habit-pill.partial .habit-mark,
+.habit-tick.partial .tick-box {
+  box-shadow: inset 0 0 0 2px var(--tint);
+  color: var(--tint);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.habit-pill.done .habit-mark,
+.habit-tick[aria-pressed='true'] .tick-box {
+  background: var(--tint);
+  box-shadow: none;
+  color: #fff;
+}
+
+.habit-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.hd {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.hd-done {
+  background: var(--c-plan);
+}
+
+.hd-partial {
+  background: linear-gradient(90deg, var(--c-plan) 50%, var(--line) 50%);
+}
+
+.hd-missed,
+.hd-today {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--fg-3);
+}
+
+.hd-today {
+  box-shadow: inset 0 0 0 1.5px var(--c-plan);
+}
+
+.hd-off,
+.hd-before {
+  opacity: 0.45;
+  transform: scale(0.6);
+}
+
+.habit-record {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.habit-record .habit-dots {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.habit-record .hd {
+  width: 9px;
+  height: 9px;
+}
+
+/* History: the day's habits as a compact line of chips. */
+.day-habits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.dh {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg-3);
+}
+
+.dh-done {
+  background: color-mix(in srgb, var(--c-plan) 16%, transparent);
+  color: var(--c-plan);
+}
+
+.dh-partial {
+  color: var(--fg-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-plan) 45%, transparent);
 }

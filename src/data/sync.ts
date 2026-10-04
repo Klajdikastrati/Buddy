@@ -100,22 +100,36 @@ async function push() {
     byTable.get(op.table)!.add(op.rowId)
   }
 
+  // One table failing (e.g. the server is missing a newer migration) must not hold
+  // back the others: each table is pushed on its own; failures stay queued.
+  const failed = new Set<SyncTable>()
+  let firstError: unknown = null
   for (const table of ORDER) {
     const ids = byTable.get(table)
     if (!ids) continue
-    if (table === 'profiles') {
-      const { settings, updatedAt } = await localSettings()
-      await upsert('profiles', [map.settingsToServer(settings, updatedAt)], 'user_id')
-    } else if (table === 'entries') {
-      await pushEntries([...ids])
-    } else {
-      const spec = SPECS[table as SpecTable] as TableSpec<unknown>
-      const rows = (await db.table(table).bulkGet([...ids])).filter((r) => r != null)
-      await upsert(spec.server, rows.map(spec.toServer), spec.onConflict)
+    try {
+      if (table === 'profiles') {
+        const { settings, updatedAt } = await localSettings()
+        await upsert('profiles', [map.settingsToServer(settings, updatedAt)], 'user_id')
+      } else if (table === 'entries') {
+        await pushEntries([...ids])
+      } else {
+        const spec = SPECS[table as SpecTable] as TableSpec<unknown>
+        const rows = (await db.table(table).bulkGet([...ids])).filter((r) => r != null)
+        await upsert(spec.server, rows.map(spec.toServer), spec.onConflict)
+      }
+    } catch (e) {
+      failed.add(table)
+      firstError ??= e
     }
   }
-  // Only drop what we just sent; writes made meanwhile stay queued.
-  await db.outbox.where('seq').belowOrEqual(maxSeq).delete()
+  // Only drop what we just sent and what landed; writes made meanwhile stay queued.
+  await db.outbox
+    .where('seq')
+    .belowOrEqual(maxSeq)
+    .filter((o) => !failed.has(o.table))
+    .delete()
+  if (firstError) throw firstError
 }
 
 const PAGE = 500

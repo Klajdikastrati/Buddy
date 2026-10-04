@@ -10,7 +10,7 @@ export async function collectExport(days: number): Promise<{ data: BuddyExport; 
   const to = localDateOf(new Date(), settings.timezone, settings.rolloverHour)
   const from = addDays(to, -(days - 1))
   const entries = await db.entries.where('localDate').between(from, to, true, true).toArray()
-  const [sets, foods, exercises, templates, checkins, trackers, recommendations, targets, firstMoney, moneyPlans] = await Promise.all([
+  const [sets, foods, exercises, templates, checkins, trackers, recommendations, targets, firstMoney, moneyPlans, plan] = await Promise.all([
     db.sets.where('entryId').anyOf(entries.map((e) => e.id)).toArray(),
     db.foods.toArray(),
     db.exercises.toArray(),
@@ -24,6 +24,7 @@ export async function collectExport(days: number): Promise<{ data: BuddyExport; 
       .filter((e) => !!e.money && !e.deletedAt)
       .first(),
     db.moneyPlans.toArray(),
+    db.plan.toArray(),
   ])
   const data = buildExport({
     exportId: uid(),
@@ -42,6 +43,7 @@ export async function collectExport(days: number): Promise<{ data: BuddyExport; 
     recommendations,
     moneySince: firstMoney?.localDate ?? null,
     moneyPlans,
+    plan,
   })
   const file = new File([JSON.stringify(data, null, 2)], exportFileName(to), { type: 'application/json' })
   return { data, file }
