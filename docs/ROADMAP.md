@@ -35,8 +35,7 @@ browser at 390×844 with test data). Nothing has run against the real database y
 3. Collect friction, then one design/feel pass with the user (screenshots in hand).
 
 ### Waiting on the user
-- **Supabase: paste `supabase/migrations/20261004130000_habits.sql`** (habits: times per day, part of day, cue).
-  Until it runs, plan items fail to sync (the new columns don't exist on the server) — they stay safe locally.
+- Supabase: `20261004130000_habits.sql` **applied by the user 2026-10-04** (habit columns on `plan_items`).
 - Supabase: `20261003150000_full_app.sql` **applied by the user 2026-10-04**. From now on schema changes are
   new migration files (never edit an applied one).
 - Supabase: login user **created by the user (2026-10-04)**. Still check "Allow new users to sign up" is off.
