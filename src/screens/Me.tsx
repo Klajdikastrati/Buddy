@@ -206,6 +206,39 @@ export function Me() {
           />
         </div>
       </section>
+
+      <DisplayInfo />
     </div>
+  )
+}
+
+/** Build + screen measurements — for diagnosing Home Screen layout on the phone. */
+function DisplayInfo() {
+  const [info] = useState(() => {
+    const probe = (css: string) => {
+      const el = document.createElement('div')
+      el.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;${css}`
+      document.body.appendChild(el)
+      const r = el.getBoundingClientRect()
+      const cs = getComputedStyle(el)
+      el.remove()
+      return { h: Math.round(r.height), pt: cs.paddingTop, pb: cs.paddingBottom }
+    }
+    const safe = probe('padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)')
+    const shell = document.querySelector('.shell')?.getBoundingClientRect().height
+    return [
+      `build ${__BUILD__}`,
+      `${matchMedia('(display-mode: standalone)').matches ? 'home screen' : 'browser'} · screen ${screen.height} · inner ${innerHeight}`,
+      `lvh ${probe('height:100lvh').h} · dvh ${probe('height:100dvh').h} · svh ${probe('height:100svh').h} · html ${Math.round(document.documentElement.getBoundingClientRect().height)} · shell ${Math.round(shell ?? 0)}`,
+      `safe top ${safe.pt} · bottom ${safe.pb}`,
+    ]
+  })
+  return (
+    <section className="group" aria-labelledby="display-h">
+      <h2 id="display-h" className="section-label">
+        Display info
+      </h2>
+      <p className="muted num display-info">{info.map((l) => <span key={l}>{l}</span>)}</p>
+    </section>
   )
 }
