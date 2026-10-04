@@ -33,7 +33,7 @@ browser at 390×844 with test data). Nothing has run against the real database y
   2026-10-04: new `money_plans` table and more recommendation types — edited in place since the file was never
   applied). Until it's applied, every push fails (new tables
   and entry kinds don't exist on the server), so local logging works but nothing syncs.
-- Supabase: create the login user (Auth → Users → Add user, auto-confirm), turn off "Allow new users to sign up".
+- Supabase: login user **created by the user (2026-10-04)**. Still check "Allow new users to sign up" is off.
 - Deploy: not decided (any static host; needs HTTPS for the PWA and the camera). GitHub push to
   `Klajdikastrati/Buddy` **not yet approved**.
 
