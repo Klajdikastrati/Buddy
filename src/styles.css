@@ -2627,7 +2627,9 @@ html.kb-open .sheet-body:last-child {
 /* ---- Floating glass tab bar (iOS / Instagram) ---- */
 
 :root {
-  --nav-h: 76px; /* 64px capsule + 12px float above the home indicator */
+  /* Room the floating bar takes above the safe area: 66px capsule sitting 21px off
+     the screen edge (over the home-indicator strip, like the GitHub app). */
+  --nav-h: 56px;
   --glass: rgb(255 255 255 / 0.62);
   --glass-edge: rgb(255 255 255 / 0.7);
   --glass-shadow: 0 10px 34px rgb(16 16 24 / 0.16), 0 2px 6px rgb(16 16 24 / 0.08);
@@ -2645,13 +2647,17 @@ html.kb-open .sheet-body:last-child {
   }
 }
 
+/* Position measured off the GitHub iOS app: 21pt from the bottom edge (over the
+   home indicator, not above it), 66px tall, 16px side margins. */
 .tabbar {
-  inset: auto 12px calc(var(--safe-b) + 10px) 12px;
+  inset: auto 16px max(10px, calc(var(--safe-b) - 13px)) 16px;
   max-width: 520px;
   margin: 0 auto;
-  height: 64px;
+  height: 66px;
   padding: 0 6px;
-  border-radius: 32px;
+  border-radius: 33px;
+  transform-origin: 50% 100%;
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
   background: var(--glass);
   backdrop-filter: blur(26px) saturate(190%);
   -webkit-backdrop-filter: blur(26px) saturate(190%);
@@ -2678,12 +2684,34 @@ html.kb-open .sheet-body:last-child {
   touch-action: none;
 }
 
+/* Scrolling down: the bar slims into a smaller capsule, labels away (iOS 26).
+   Scrolling up, reaching the top, switching tabs or touching it brings it back. */
+.tabbar.compact {
+  transform: scale(0.84);
+}
+
+.tabbar .tab > span:last-child:not(.add-disc) {
+  transition: opacity 200ms ease;
+}
+
+.tabbar.compact .tab > span:last-child:not(.add-disc) {
+  opacity: 0;
+}
+
+.tabbar .tab svg {
+  transition: translate 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.tabbar.compact .tab:not(.tab-add) svg {
+  translate: 0 7px;
+}
+
 .tab-bubble {
   position: absolute;
-  top: 6px;
+  top: 5px;
   left: 0;
-  height: 52px;
-  border-radius: 26px;
+  height: 56px;
+  border-radius: 28px;
   background: var(--bubble);
   box-shadow: inset 0 0 0 0.5px var(--bubble-edge), inset 0 1px 0 var(--bubble-edge);
   pointer-events: none;

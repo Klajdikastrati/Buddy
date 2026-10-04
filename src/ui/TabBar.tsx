@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Icon, type IconName } from './icons'
 
 export interface Tab {
@@ -48,7 +48,7 @@ export function TabBar({
   const nav = useRef<HTMLElement>(null)
   const bubble = useRef<HTMLSpanElement>(null)
   const tabs = useRef<(HTMLAnchorElement | null)[]>([])
-  const press = useRef<{ id: number; x0: number; barLeft: number; x: number; moved: boolean } | null>(null)
+  const press = useRef<{ id: number; x0: number; x: number; moved: boolean } | null>(null)
   const currentRef = useRef(current)
   currentRef.current = current
   /** Layout, measured once (mount, resize, press) — never during a drag. */
@@ -65,13 +65,40 @@ export function TabBar({
     [all.length], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
+  /** Layout positions (offset*, so the bar's own shrink transform doesn't skew them). */
   const measure = () => {
     if (!nav.current || tabs.current.some((t) => !t)) return
-    const base = nav.current.getBoundingClientRect().left
-    const rects = tabs.current.map((el) => el!.getBoundingClientRect())
-    geo.current = { centres: rects.map((r) => r.left - base + r.width / 2), width: rects[0].width }
+    const els = tabs.current as HTMLAnchorElement[]
+    geo.current = { centres: els.map((el) => el.offsetLeft + el.offsetWidth / 2), width: els[0].offsetWidth }
     if (bubble.current) bubble.current.style.width = `${geo.current.width}px`
   }
+
+  /** Finger x on screen → x in the bar's own (unscaled) layout. */
+  const localX = (clientX: number) => {
+    const n = nav.current!
+    const r = n.getBoundingClientRect()
+    return (clientX - r.left) * (n.offsetWidth / r.width)
+  }
+
+  // Slim the bar while scrolling down a page; bring it back on the way up or at the top.
+  useEffect(() => {
+    const n = nav.current
+    if (!n) return
+    const last = new WeakMap<Element, number>()
+    const onScroll = (e: Event) => {
+      const el = e.target
+      if (!(el instanceof HTMLElement) || el.closest('dialog, .tabbar')) return
+      const top = el.scrollTop
+      const prev = last.get(el) ?? top
+      last.set(el, top)
+      if (top < 24) n.classList.remove('compact')
+      else if (top - prev > 4) n.classList.add('compact')
+      else if (prev - top > 8) n.classList.remove('compact')
+    }
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true })
+    return () => document.removeEventListener('scroll', onScroll, { capture: true })
+  }, [])
+  useEffect(() => nav.current?.classList.remove('compact'), [current])
 
   /** Paint the current spring state: one transform on the bubble, icon swell by distance. */
   const paint = () => {
@@ -154,7 +181,7 @@ export function TabBar({
   const follow = (clientX: number) => {
     const p = press.current!
     const { centres } = geo.current
-    p.x = Math.max(centres[0], Math.min(centres[centres.length - 1], clientX - p.barLeft))
+    p.x = Math.max(centres[0], Math.min(centres[centres.length - 1], localX(clientX)))
     const s = sp.current
     s.tx = p.x
     kick()
@@ -214,10 +241,12 @@ export function TabBar({
       className="tabbar"
       aria-label="Main"
       onPointerDown={(e) => {
+        // Touching a slimmed bar brings it back to full size.
+        nav.current?.classList.remove('compact')
         if (!(e.target as HTMLElement).closest('.tab:not(.tab-add)')) return
         e.currentTarget.setPointerCapture(e.pointerId)
         measure()
-        press.current = { id: e.pointerId, x0: e.clientX, barLeft: nav.current!.getBoundingClientRect().left, x: 0, moved: false }
+        press.current = { id: e.pointerId, x0: e.clientX, x: 0, moved: false }
         // The lens lifts under the finger straight away.
         const s = sp.current
         s.follow = true
