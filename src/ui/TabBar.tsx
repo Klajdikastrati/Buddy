@@ -7,18 +7,26 @@ export interface Tab {
   icon: IconName
 }
 
-/** Moves the bubble to a (fractional) tab index; `live` = following a finger. */
+/** Moves the bubble to a tab index; `live` = following a finger. */
 export type BubbleFn = (pos: number, live: boolean) => void
 
-const SPRING = 'cubic-bezier(0.3, 1.35, 0.5, 1)'
-const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)'
+/*
+ * Springs, per frame (rAF), on transform only — never CSS transitions, which
+ * restart on every pointer move and shake. Values from feel-testing:
+ * following a finger is stiff and critically damped (tracks without lag or
+ * wobble); settling onto a tab is softer with a little overshoot.
+ */
+const FOLLOW = { k: 1400, c: 75 }
+const SETTLE = { k: 520, c: 34 }
+const SCALE = { k: 700, c: 42 }
+const LIFT = 1.28 // lens size while pressed
 
 /**
  * Floating glass tab bar, modelled on the iOS 26 (Liquid Glass) tab bar:
- * - tap: the bubble glides to the tab, stretching on the way, and settles;
+ * - tap: the bubble glides to the tab (stretching with its speed) and settles;
  * - press and slide (one motion, no hold): the bubble lifts into a larger glass
- *   lens that follows the finger, the icon under it swells; release selects the
- *   tab under the finger and the lens shrinks back into the pill.
+ *   lens that follows the finger sideways only; the icon under it swells; release
+ *   selects the tab under the finger and the lens shrinks back into the pill.
  * The + stays dead centre between the two groups and isn't part of the slide.
  */
 export function TabBar({
@@ -40,11 +48,13 @@ export function TabBar({
   const nav = useRef<HTMLElement>(null)
   const bubble = useRef<HTMLSpanElement>(null)
   const tabs = useRef<(HTMLAnchorElement | null)[]>([])
-  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const moveRef = useRef<BubbleFn | null>(null)
-  const press = useRef<{ id: number; centres: number[]; pos: number; moved: boolean; x0: number } | null>(null)
+  const press = useRef<{ id: number; x0: number; barLeft: number; x: number; moved: boolean } | null>(null)
   const currentRef = useRef(current)
   currentRef.current = current
+  /** Layout, measured once (mount, resize, press) — never during a drag. */
+  const geo = useRef({ centres: [] as number[], width: 0 })
+  /** Spring state: x = bubble centre (px in the bar), s = scale. */
+  const sp = useRef({ x: 0, v: 0, tx: 0, s: 1, vs: 0, ts: 1, follow: false, raf: 0, last: 0 })
   const all = [...left, ...right]
   // Stable ref setters: a new callback per render would detach/reattach the tab mid-commit.
   const setTab = useMemo(
@@ -55,83 +65,123 @@ export function TabBar({
     [all.length], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
-  /** Centre x of each tab relative to the bar. */
-  const centres = () => {
-    const base = nav.current!.getBoundingClientRect().left
-    return tabs.current.map((el) => {
-      const r = el!.getBoundingClientRect()
-      return r.left - base + r.width / 2
-    })
+  const measure = () => {
+    if (!nav.current || tabs.current.some((t) => !t)) return
+    const base = nav.current.getBoundingClientRect().left
+    const rects = tabs.current.map((el) => el!.getBoundingClientRect())
+    geo.current = { centres: rects.map((r) => r.left - base + r.width / 2), width: rects[0].width }
+    if (bubble.current) bubble.current.style.width = `${geo.current.width}px`
   }
 
-  /** Swell the icon nearest the lens, like it's magnified. */
-  const magnify = (pos: number | null) => {
+  /** Paint the current spring state: one transform on the bubble, icon swell by distance. */
+  const paint = () => {
+    const s = sp.current
+    const b = bubble.current
+    const { centres, width } = geo.current
+    if (!b || !centres.length) return
+    // Liquid stretch: wider with speed while gliding (not while lifted).
+    const stretch = s.follow ? 0 : Math.min(0.22, Math.abs(s.v) / 4000)
+    b.style.transform = `translate3d(${s.x - width / 2}px, 0, 0) scale(${s.s + stretch}, ${s.s})`
+    const gap = centres.length > 1 ? centres[1] - centres[0] : width
     tabs.current.forEach((el, i) => {
       const svg = el?.querySelector('svg')
       if (!svg) return
-      const k = pos == null ? 0 : Math.max(0, 1 - Math.abs(pos - i))
-      svg.style.transform = k ? `scale(${1 + 0.22 * k})` : ''
+      const k = s.s > 1.02 ? Math.max(0, 1 - Math.abs(s.x - centres[i]) / gap) * ((s.s - 1) / (LIFT - 1)) : 0
+      svg.style.transform = k > 0.01 ? `scale(${1 + 0.2 * k})` : ''
     })
+  }
+
+  const step = (now: number) => {
+    const s = sp.current
+    const dt = Math.min(1 / 30, (now - (s.last || now)) / 1000) || 1 / 60
+    s.last = now
+    const p = s.follow ? FOLLOW : SETTLE
+    // Fixed small sub-steps keep the stiff springs stable even when a frame is late.
+    const n = Math.ceil(dt / (1 / 480))
+    const h = dt / n
+    for (let j = 0; j < n; j++) {
+      s.v += (p.k * (s.tx - s.x) - p.c * s.v) * h
+      s.x += s.v * h
+      s.vs += (SCALE.k * (s.ts - s.s) - SCALE.c * s.vs) * h
+      s.s += s.vs * h
+    }
+    paint()
+    const resting = !s.follow && Math.abs(s.tx - s.x) < 0.3 && Math.abs(s.v) < 5 && Math.abs(s.ts - s.s) < 0.002 && Math.abs(s.vs) < 0.01
+    if (resting) {
+      s.x = s.tx
+      s.s = s.ts
+      s.v = s.vs = 0
+      paint()
+      s.raf = 0
+      s.last = 0
+    } else s.raf = requestAnimationFrame(step)
+  }
+  const kick = () => {
+    if (!sp.current.raf) sp.current.raf = requestAnimationFrame(step)
   }
 
   useLayoutEffect(() => {
     const move: BubbleFn = (pos, live) => {
-      const b = bubble.current
-      if (!b || !nav.current || tabs.current.some((t) => !t)) return
-      const cs = centres()
-      const w0 = tabs.current[0]!.getBoundingClientRect().width
-      const i = Math.max(0, Math.min(cs.length - 1, Math.floor(pos)))
-      const f = Math.max(0, Math.min(1, pos - i))
-      const c = cs[i] + ((cs[i + 1] ?? cs[i]) - cs[i]) * f
-      clearTimeout(settle.current)
-      b.style.width = `${w0}px`
-      const at = `translate3d(${c - w0 / 2}px, 0, 0)`
-      if (live) {
-        // Lifted lens: bigger than the pill, follows the finger 1:1.
-        b.classList.add('lifted')
-        b.style.transition = 'transform 70ms linear'
-        b.style.transform = `${at} scale(1.32, 1.24)`
-      } else {
-        b.classList.remove('lifted')
-        // Glide: stretch along the way and overshoot a touch, then settle round.
-        b.style.transition = `transform 400ms ${SPRING}`
-        b.style.transform = `${at} scale(1.16, 0.94)`
-        settle.current = setTimeout(() => {
-          b.style.transition = `transform 260ms ${EASE}`
-          b.style.transform = `${at} scale(1)`
-        }, 190)
-      }
+      const { centres } = geo.current
+      if (!centres.length) return
+      const i = Math.max(0, Math.min(centres.length - 1, Math.round(pos)))
+      const s = sp.current
+      s.tx = centres[i]
+      s.follow = live
+      s.ts = live ? LIFT : 1
+      bubble.current?.classList.toggle('lifted', live)
+      kick()
     }
-    moveRef.current = move
     bind(move)
-    // First placement without animation.
-    const b = bubble.current
-    move(current, false)
-    clearTimeout(settle.current)
-    if (b) {
-      b.style.transition = 'none'
-      b.style.transform = b.style.transform.replace('scale(1.16, 0.94)', 'scale(1)')
+    measure()
+    // First placement: no animation.
+    const s = sp.current
+    s.x = s.tx = geo.current.centres[current] ?? 0
+    paint()
+    const onResize = () => {
+      measure()
+      s.x = s.tx = geo.current.centres[currentRef.current] ?? s.x
+      paint()
     }
-    const onResize = () => move(currentRef.current, false)
     window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      cancelAnimationFrame(s.raf)
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Fractional tab index for a finger at bar-relative x. */
-  const posAt = (x: number, cs: number[]) => {
-    if (x <= cs[0]) return 0
-    for (let i = 0; i < cs.length - 1; i++) if (x <= cs[i + 1]) return i + (x - cs[i]) / (cs[i + 1] - cs[i])
-    return cs.length - 1
+  /** Finger x → lens target, clamped to the outer tab centres (sideways only). */
+  const follow = (clientX: number) => {
+    const p = press.current!
+    const { centres } = geo.current
+    p.x = Math.max(centres[0], Math.min(centres[centres.length - 1], clientX - p.barLeft))
+    const s = sp.current
+    s.tx = p.x
+    kick()
+  }
+
+  /** Nearest tab to a bar-relative x. */
+  const nearest = (x: number) => {
+    const { centres } = geo.current
+    let best = 0
+    centres.forEach((c, i) => {
+      if (Math.abs(c - x) < Math.abs(centres[best] - x)) best = i
+    })
+    return best
   }
 
   const release = (select: boolean) => {
     const p = press.current
     press.current = null
-    magnify(null)
     if (!p) return
-    const i = Math.round(p.pos)
-    // Shrink the lens back into the pill where it lands; navigation re-settles it too.
-    moveRef.current?.(select ? i : currentRef.current, false)
+    const i = nearest(p.x)
+    const target = select ? i : currentRef.current
+    const s = sp.current
+    s.follow = false
+    s.ts = 1
+    s.tx = geo.current.centres[target]
+    bubble.current?.classList.remove('lifted')
+    kick()
     // Same tab: scroll to top / close a pushed screen — but not after sliding away and back.
     if (select && (i !== currentRef.current || !p.moved)) onTab(i)
   }
@@ -166,21 +216,20 @@ export function TabBar({
       onPointerDown={(e) => {
         if (!(e.target as HTMLElement).closest('.tab:not(.tab-add)')) return
         e.currentTarget.setPointerCapture(e.pointerId)
-        const cs = centres()
-        const x = e.clientX - nav.current!.getBoundingClientRect().left
-        const pos = posAt(x, cs)
-        press.current = { id: e.pointerId, centres: cs, pos, moved: false, x0: e.clientX }
+        measure()
+        press.current = { id: e.pointerId, x0: e.clientX, barLeft: nav.current!.getBoundingClientRect().left, x: 0, moved: false }
         // The lens lifts under the finger straight away.
-        moveRef.current?.(pos, true)
-        magnify(pos)
+        const s = sp.current
+        s.follow = true
+        s.ts = LIFT
+        bubble.current?.classList.add('lifted')
+        follow(e.clientX)
       }}
       onPointerMove={(e) => {
         const p = press.current
         if (!p || p.id !== e.pointerId) return
         if (Math.abs(e.clientX - p.x0) > 6) p.moved = true
-        p.pos = posAt(e.clientX - nav.current!.getBoundingClientRect().left, p.centres)
-        moveRef.current?.(p.pos, true)
-        magnify(p.pos)
+        follow(e.clientX) // vertical movement is ignored
       }}
       onPointerUp={(e) => {
         if (press.current?.id === e.pointerId) release(true)
