@@ -30,8 +30,10 @@ browser at 390×844 with test data). Nothing has run against the real database y
 - Supabase: `20261003150000_full_app.sql` **applied by the user 2026-10-04**. From now on schema changes are
   new migration files (never edit an applied one).
 - Supabase: login user **created by the user (2026-10-04)**. Still check "Allow new users to sign up" is off.
-- GitHub: pushed to `Klajdikastrati/Buddy` (public repo; user approved 2026-10-04). Deploy: Vercel (static,
-  `vercel.json` SPA fallback) — user connects the repo and sets `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- GitHub: pushed to `Klajdikastrati/Buddy` (public repo; user approved 2026-10-04; suggested making it private).
+- **Live: https://buddy-three-sigma.vercel.app** (Vercel Hobby, auto-deploys on push to `main`; env vars set in
+  Vercel; `vercel.json` SPA fallback). Verified 2026-10-04: routes, service worker, Supabase auth reachable.
+  Next: user signs in on the iPhone, adds to Home Screen, first real sync check.
 
 Routes (all built): `/`, `/history`, `/plan`, `/me`, `/nutrition`, `/training`, `/workout`, `/me/foods`,
 `/me/training`, `/me/targets`, `/me/trackers`, `/me/analyst`.
