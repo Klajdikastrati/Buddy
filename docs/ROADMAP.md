@@ -27,15 +27,11 @@ browser at 390×844 with test data). Nothing has run against the real database y
 3. Collect friction, then one design/feel pass with the user (screenshots in hand).
 
 ### Waiting on the user
-- Supabase: paste `supabase/migrations/20261003150000_full_app.sql` into the SQL Editor — **checked 2026-10-03:
-  still current** (no type/sync changes since it was written; 2026-10-03 later: `foods.source` now also allows
-  `'generic'`, and `recommendations` gained `details` jsonb + nullable target columns for plan proposals;
-  2026-10-04: new `money_plans` table and more recommendation types — edited in place since the file was never
-  applied). Until it's applied, every push fails (new tables
-  and entry kinds don't exist on the server), so local logging works but nothing syncs.
+- Supabase: `20261003150000_full_app.sql` **applied by the user 2026-10-04**. From now on schema changes are
+  new migration files (never edit an applied one).
 - Supabase: login user **created by the user (2026-10-04)**. Still check "Allow new users to sign up" is off.
-- Deploy: not decided (any static host; needs HTTPS for the PWA and the camera). GitHub push to
-  `Klajdikastrati/Buddy` **not yet approved**.
+- GitHub: pushed to `Klajdikastrati/Buddy` (public repo; user approved 2026-10-04). Deploy: Vercel (static,
+  `vercel.json` SPA fallback) — user connects the repo and sets `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`.
 
 Routes (all built): `/`, `/history`, `/plan`, `/me`, `/nutrition`, `/training`, `/workout`, `/me/foods`,
 `/me/training`, `/me/targets`, `/me/trackers`, `/me/analyst`.
