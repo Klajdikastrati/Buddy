@@ -33,3 +33,5 @@ Success metric: still opened daily six months from now.
   item by item. Buddy itself stays AI-free; "not a coach" applies to the app, not to the Analyst.
 - 2026-10-03 — Today is a compact tile grid (user dislikes scrolling); navigation is Instagram-style spatial
   motion — swipeable tab pager, pushed screens, draggable sheets (user: static/delayed feel is very noticeable).
+- 2026-10-04 — Navigation follows the GitHub iOS app instead: instant in-place tab switch (no tab swipe), gliding
+  glass bubble you can drag along the tab bar; Home Screen black strip fixed (shell = 100lvh).

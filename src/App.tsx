@@ -137,7 +137,6 @@ function Shell({ userId }: { userId: string }) {
       <Pager
         index={tabIndex}
         covered={pushed}
-        onSwipe={(i) => navigate(TABS[i].path)}
         onPosition={(pos, live) => bubble.current?.(pos, live)}
         pages={TAB_PAGES}
       />

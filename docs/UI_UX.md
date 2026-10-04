@@ -42,8 +42,10 @@ optional. Time defaults to now. Note hidden behind "+ Add note". No confirm dial
 - Lists: inset grouped, inset hairline separators; rows carry an icon chip when they represent a domain.
 - No gradients, no glow, no confetti, no marketing copy, one-line empty states.
 - Touch: ≥44px targets (rows 60px, buttons 50px), inputs ≥16px, safe areas, sheets sit above the iOS keyboard (`--kb`).
-- Motion is spatial and never waits (user: "Instagram-like"; any delay is noticeable). Tabs are a horizontal
-  pager — swipe or tap, pages slide by their position, scroll position kept per tab, re-tap = scroll to top.
+- Motion never waits (any delay is noticeable). Native iOS, modelled on the GitHub iOS app (user, 2026-10-04):
+  tabs switch instantly in place with a 160 ms fade — no sideways swipe between tabs; scroll position kept per tab,
+  re-tap = scroll to top. Floating glass tab bar: the bubble glides/stretches to the new tab and follows a finger
+  dragged along the bar (release = switch).
   Detail screens push in from the right (tabs shift back + dim), edge-swipe back; Workout Mode slides up as a
   modal. Sheets slide up (iOS curve), slide down on every close, drag the header down to dismiss. ~340 ms
   `cubic-bezier(.22,1,.36,1)`, transform/opacity only, follows the finger, reduced-motion respected. No count-ups.
