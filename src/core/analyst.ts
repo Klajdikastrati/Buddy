@@ -87,7 +87,7 @@ export interface ProposedTemplate {
 export type ProposedChange = ProposedTarget | ProposedPlanItem | ProposedMoneyPlan | ProposedTracker | ProposedTemplate
 export const PROPOSAL_TYPES = ['target', 'plan_item', 'money_plan', 'tracker', 'workout_template'] as const
 const MONEY_KINDS = ['bill', 'income', 'planned'] as const
-const FIELD_TYPES: readonly TrackerFieldType[] = ['number', 'text', 'bool']
+const FIELD_TYPES: readonly TrackerFieldType[] = ['number', 'text', 'bool', 'count']
 
 const PLAN_KINDS = ['goal', 'routine', 'task'] as const
 

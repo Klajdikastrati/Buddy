@@ -56,7 +56,7 @@ export function dailySeries({ entries, sets, checkins, trackers = [], from, to, 
   const workouts = finishedWorkouts(live)
   const setsOf = new Map<ID, WorkoutSet[]>()
   for (const s of sets) setsOf.set(s.entryId, [...(setsOf.get(s.entryId) ?? []), s])
-  const numericFields = new Map(trackers.map((t) => [t.id, new Set(t.fields.filter((f) => f.type === 'number').map((f) => f.key))]))
+  const numericFields = new Map(trackers.map((t) => [t.id, new Set(t.fields.filter((f) => f.type === 'number' || f.type === 'count').map((f) => f.key))]))
 
   const rows: DayRow[] = []
   for (let d = from; d <= to; d = addDays(d, 1)) {

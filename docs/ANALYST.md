@@ -122,7 +122,9 @@ Rules for `proposed_changes`:
   equal it — convert EUR first and say the rate you used). Bill/income need `day_of_month` 1–31 (monthly) and
   `date` null; planned needs `date`. Never propose a balance — ask the user and let them set it. A row with the same
   kind and name updates the existing one.
-- **tracker** — `name` ≤60, `fields` 1–8 of `{label ≤40, type number|text|bool, unit (number only) or null}`.
+- **tracker** — `name` ≤60, `fields` 1–8 of `{label ≤40, type number|text|bool|count, unit (number only) or null}`.
+  `count` = tap counter: a +1 button on Today (each tap = one entry of 1), with time since the last tap and the
+  longest gap; daily sums appear in `daily.trackers`. The user's "Cigarettes" is a tap counter.
   Skipped if a tracker with that name exists.
 - **workout_template** — `name` ≤60, `weekdays` (may be empty), `exercises` 1–15 of `{name, sets 1–10, reps 1–100
   or null}`. Names match the library case-insensitively (see `exercises` / `workout_templates`); unknown names are

@@ -1,6 +1,7 @@
 import { useLiveQuery } from '../ui/live'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ACTIVITY_LABEL, activityOn, sleepSummary, weightSummary } from '../core/body'
+import { counterField, counterStats, formatGap } from '../core/counter'
 import { addDays, formatDuration, formatShortDate, hourIn, monthStart, weekdayOf, weekStart } from '../core/dates'
 import { formatMoney, moneySummary } from '../core/money'
 import { nutritionOn } from '../core/nutrition'
@@ -8,8 +9,10 @@ import { priorities } from '../core/plan'
 import { formatNumber } from '../core/numbers'
 import { targetOn } from '../core/targets'
 import { durationMin, finishedWorkouts, templatesOn, workoutsInWeek } from '../core/training'
-import type { DayCheckin, Entry, ID, LocalDate, Target, WorkoutTemplate } from '../core/types'
+import type { DayCheckin, Entry, ID, LocalDate, Target, TrackerDef, WorkoutTemplate } from '../core/types'
 import { db } from '../data/db'
+import { setEntryDeleted } from '../data/repo'
+import { logTracker } from '../data/repo-trackers'
 import { Bar } from '../ui/Bar'
 import { DOMAIN, type DomainKey } from '../ui/domains'
 import { EntryRow } from '../ui/EntryRow'
@@ -17,6 +20,7 @@ import { navigate, useSettings, useToday } from '../ui/hooks'
 import { Icon, IconChip } from '../ui/icons'
 import { PlanRow } from '../ui/PlanRow'
 import { openSheet } from '../ui/sheets'
+import { toast } from '../ui/toast'
 
 /** After this hour (local) Today asks for the day's check-in if it's missing. */
 const EVENING_HOUR = 19
@@ -46,8 +50,9 @@ export function Today() {
     return null
   const top = priorities(plan, today)
 
+  const counters = (trackers ?? []).filter((t) => !t.deletedAt && !t.archived && counterField(t))
   const todays = entries
-    .filter((e) => e.localDate === today && !e.deletedAt)
+    .filter((e) => e.localDate === today && !e.deletedAt && !(e.custom && counters.some((c) => c.id === e.custom!.trackerId)))
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
   const evening = hourIn(new Date(), settings.timezone) >= EVENING_HOUR
 
@@ -64,6 +69,10 @@ export function Today() {
         <BodyTiles entries={entries} weights={weights} today={today} targets={targets} />
         <WorkoutTile entries={entries} today={today} targets={targets} templates={templates} active={activeWorkout} />
       </div>
+
+      {counters.map((c) => (
+        <CounterCard key={c.id} def={c} today={today} />
+      ))}
 
       {top.shown.length > 0 && (
         <section aria-labelledby="prio-h">
@@ -369,5 +378,56 @@ function CheckinRow({ checkin, evening }: { checkin: DayCheckin | null; evening:
         Check in
       </button>
     </div>
+  )
+}
+
+/**
+ * One tap = one more (e.g. a cigarette). Shows today's count, time since the
+ * last one (live) and the longest gap since counting started.
+ */
+function CounterCard({ def, today }: { def: TrackerDef; today: LocalDate }) {
+  const taps = useLiveQuery(() => db.entries.where('kind').equals('custom').filter((e) => e.custom?.trackerId === def.id).toArray(), [def.id])
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [])
+  if (!taps) return null
+  const field = counterField(def)!
+  const s = counterStats(taps, def, today, addDays(today, -1), now)
+  const tint = { '--tint': DOMAIN.tracker.tint } as React.CSSProperties
+
+  async function add() {
+    const t = new Date().toISOString()
+    setNow(Date.parse(t))
+    const id = await logTracker(def, { [field.key]: 1 }, t, null)
+    toast(`${def.name}: ${s.today + 1} today`, { label: 'Undo', run: () => setEntryDeleted(id, true) })
+  }
+
+  return (
+    <section className="counter" style={tint} aria-label={def.name}>
+      <button type="button" className="counter-main" onClick={() => openSheet({ kind: 'tracker-log', trackerId: def.id })} aria-label={`${def.name}: log with a different number or time`}>
+        <span className="counter-head">
+          <span className="block-label">{def.name}</span>
+          <span className="counter-count num">
+            {s.today}
+            <span className="muted"> today{s.yesterday ? ` · ${s.yesterday} yesterday` : ''}</span>
+          </span>
+        </span>
+        <span className="counter-stats num">
+          <span>
+            <span className="muted">Last </span>
+            {s.sinceLastMin == null ? '—' : s.sinceLastMin < 1 ? 'just now' : `${formatGap(s.sinceLastMin)} ago`}
+          </span>
+          <span>
+            <span className="muted">Longest gap </span>
+            {s.longestMin == null || s.longestMin < 1 ? '—' : formatGap(s.longestMin)}
+          </span>
+        </span>
+      </button>
+      <button type="button" className="counter-add" aria-label={`Add one ${def.name.toLowerCase()}`} onClick={() => void add()}>
+        <Icon name="plus" size={26} strokeWidth={2.6} />
+      </button>
+    </section>
   )
 }

@@ -12,6 +12,7 @@ import { Sheet } from '../ui/Sheet'
 import { toast } from '../ui/toast'
 
 const TYPES = [
+  { value: 'count', label: 'Tap counter' },
   { value: 'number', label: 'Number' },
   { value: 'text', label: 'Text' },
   { value: 'bool', label: 'Yes / no' },
@@ -140,7 +141,7 @@ function TrackerLogForm({ def, entry }: { def: TrackerDef; entry?: Entry }) {
     const out: CustomFacet['values'] = {}
     for (const f of def.fields) {
       const v = values[f.key]
-      if (f.type === 'number') {
+      if (f.type === 'number' || f.type === 'count') {
         const n = typeof v === 'string' && v.trim() ? parseDecimal(v) : null
         if (typeof v === 'string' && v.trim() && n == null) return setError(`${f.label} must be a number.`)
         out[f.key] = n
@@ -190,8 +191,8 @@ function TrackerLogForm({ def, entry }: { def: TrackerDef; entry?: Entry }) {
               <span className="field-label">{f.label}</span>
               <div className="input-unit">
                 <input
-                  className={`input ${f.type === 'number' && i === 0 ? 'input-big' : ''} ${f.type === 'number' ? 'num' : ''}`}
-                  inputMode={f.type === 'number' ? 'decimal' : undefined}
+                  className={`input ${f.type !== 'text' && i === 0 ? 'input-big' : ''} ${f.type !== 'text' ? 'num' : ''}`}
+                  inputMode={f.type === 'count' ? 'numeric' : f.type === 'number' ? 'decimal' : undefined}
                   autoComplete="off"
                   data-autofocus={i === 0 && !entry ? '' : undefined}
                   value={(values[f.key] as string) ?? ''}

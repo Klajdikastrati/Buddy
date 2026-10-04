@@ -53,7 +53,7 @@ export function entryLine(e: Entry, timeZone: string, tracker?: TrackerDef): Ent
       const v = e.custom!.values[f.key]
       if (v == null || v === '') return []
       if (f.type === 'bool') return [v ? f.label : `no ${f.label.toLowerCase()}`]
-      if (f.type === 'number') return [`${num(Number(v), 2)}${f.unit ? ` ${f.unit}` : ''}`]
+      if (f.type === 'number' || f.type === 'count') return [`${num(Number(v), 2)}${f.unit ? ` ${f.unit}` : ''}`]
       return [String(v)]
     })
     side = parts.shift() ?? null

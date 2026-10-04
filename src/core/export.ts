@@ -249,7 +249,7 @@ export function buildExport(input: ExportInput) {
         note: 'never a balance — the user sets that themselves; check money_plan.plans first to avoid duplicates',
       },
       tracker: {
-        fields: 'id, type:"tracker", name (≤60), fields: [{ label (≤40), type: number|text|bool, unit (number only) or null }] (1–8), reason, confidence',
+        fields: 'id, type:"tracker", name (≤60), fields: [{ label (≤40), type: number|text|bool|count, unit (number only) or null }] (1–8), reason, confidence; count = tap counter (+1 button on Today, time since last, longest gap)',
         note: 'skipped if a tracker with the same name exists',
       },
       workout_template: {

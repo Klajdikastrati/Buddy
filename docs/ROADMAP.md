@@ -16,6 +16,8 @@ browser at 390×844 with test data). Nothing has run against the real database y
 - Money planner (2026-10-04): Money dashboard opens with Balance now, free per day until payday, balance-ahead
   line, Coming up (31 days) and the Money plan (bills, income, planned spends); "Paid — log it now" on a plan row.
 - Workout Mode: swap an exercise in place (unticked sets move to the new one).
+- Tap counters (tracker field type `count`): +1 card on Today with today/yesterday, time since last, longest gap
+  (user's Cigarettes). Counter taps are kept out of "Logged today"; History still lists each tap (see Known issues).
 - Analyst can propose money plan rows, trackers and workout templates (validated, approved one by one); the export
   carries `money_plan` (rows + forecast) and `workout_templates`.
 - Pure logic in `src/core/*` with 72 Vitest tests; writes in `src/data/repo-*.ts`; one daily series
@@ -48,6 +50,7 @@ category budgets (after real use) · multi-currency (salary in EUR is entered co
   EAN-13 and manual entry works.
 - Workout Mode: no rest timer, warm-up flag not settable in the UI. Analyst "Apply" has no Undo (edit the target
   in Me → Targets). Sleep "last night" includes naps logged that day.
+- History → Days lists every counter tap as its own row (could collapse into one "Cigarettes ×N" row).
 - Lint warnings only (`Date.now()` during render in a few sheets) — harmless.
 - Motion measured in dev only (StrictMode, unminified): pushed screens fill in ~55 ms, Workout Mode's rows
   ~0.2–0.4 s behind an instant placeholder frame. Re-check on the iPhone with a production build.

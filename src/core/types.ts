@@ -217,7 +217,8 @@ export interface PlanItem extends Synced {
   archived: boolean
 }
 
-export type TrackerFieldType = 'number' | 'text' | 'bool'
+/** `count` = tap counter: each tap logs 1 (summed per day), with a +1 button on Today. */
+export type TrackerFieldType = 'number' | 'text' | 'bool' | 'count'
 
 export interface TrackerField {
   key: string
